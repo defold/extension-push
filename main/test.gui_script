@@ -1,0 +1,41 @@
+function init(self)
+    msg.post(nil, "acquire_input_focus")
+end
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("set_message") then
+		local node = gui.get_node("message")
+		gui.set_text(node, message.text)
+	elseif message_id == hash("set_payload") then
+		local node = gui.get_node("payload")
+		gui.set_text(node, message.text)
+	end
+end
+
+function on_input(self, action_id, action)
+	if action_id == hash("mouse_press") and action.pressed == true then
+		local x = action.x
+		local y = action.y
+		
+		-- Test if user has touched local button
+		if gui.pick_node(gui.get_node("local10"), x, y) then
+			msg.post("push#script", "push_local", {delay = 10})
+			
+		elseif gui.pick_node(gui.get_node("local30"), x, y) then
+			msg.post("push#script", "push_local", {delay = 30})
+			
+		elseif gui.pick_node(gui.get_node("get"), x, y) then
+			msg.post("push#script", "push_get")
+			
+		elseif gui.pick_node(gui.get_node("getall"), x, y) then
+			msg.post("push#script", "push_get_all")
+			
+		elseif gui.pick_node(gui.get_node("cancel"), x, y) then
+			msg.post("push#script", "push_cancel")
+
+		elseif gui.pick_node(gui.get_node("cancel_all"), x, y) then
+			msg.post("push#script", "push_cancel", {all = true})
+			
+		end
+	end
+end

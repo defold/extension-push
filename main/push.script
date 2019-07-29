@@ -1,0 +1,168 @@
+function table.val_to_str ( v )
+  if "string" == type( v ) then
+    v = string.gsub( v, "\n", "\\n" )
+    if string.match( string.gsub(v,"[^'\"]",""), '^"+$' ) then
+      return "'" .. v .. "'"
+    end
+    return '"' .. string.gsub(v,'"', '\\"' ) .. '"'
+  else
+    return "table" == type( v ) and table.tostring( v ) or
+      tostring( v )
+  end
+end
+
+function table.key_to_str ( k )
+  if "string" == type( k ) and string.match( k, "^[_%a][_%a%d]*$" ) then
+    return k
+  else
+    return "[" .. table.val_to_str( k ) .. "]"
+  end
+end
+
+function table.tostring( tbl )
+  local result, done = {}, {}
+  for k, v in ipairs( tbl ) do
+    table.insert( result, table.val_to_str( v ) )
+    done[ k ] = true
+  end
+  for k, v in pairs( tbl ) do
+    if not done[ k ] then
+      table.insert( result,
+        table.key_to_str( k ) .. " = " .. table.val_to_str( v ) )
+    end
+  end
+  return "{ " .. table.concat( result, ", " ) .. " }"
+end
+
+local function set_text(text)
+    msg.post("/gui#gui", "set_message", { text = text and text or "nil"})
+end
+
+local function set_payload(text)
+    msg.post("/gui#gui", "set_payload", { text = text and text or "nil"})
+end
+
+local function listener(self, payload, origin, activated)
+    -- The payload arrives here.
+    set_text(string.format("Push payload received: (activated: %s)", tostring(activated)))
+    set_payload(table.tostring(payload))
+    pprint(payload)
+end
+
+
+function init(self)
+    local sysinfo = sys.get_sys_info()
+    if sysinfo.system_name == "Android" then
+        msg.post("#", "push_android")
+    elseif sysinfo.system_name == "iPhone OS" then
+        msg.post("#", "push_ios")
+    else
+        set_text("Notifications work only on iOS or Android")
+    end
+
+    self.id = nil
+
+    if push == nil then
+        return
+    end
+
+    t, err = push.get_all_scheduled()
+    set_text("push.get_all_scheduled()")
+    if t ~= nil then
+        set_payload(table.tostring(t))
+    else
+        set_payload("No events scheduled")
+    end
+end
+
+function on_message(self, message_id, message)
+
+    if push == nil then
+        --return
+        print(message_id)
+    end
+
+    if message_id == hash("push_ios") then
+        local alerts = {push.NOTIFICATION_BADGE, push.NOTIFICATION_SOUND, push.NOTIFICATION_ALERT}
+        push.register(alerts, function (self, token, error)
+            if token then
+                local s = ""
+                for i = 1,#token do
+                    s = s .. string.format("%02x", string.byte(token, i))
+                end
+                print(s)
+            else
+                set_text("Push error:" .. error.error)
+            end
+        end)
+        push.set_listener(listener)
+        set_text("Waiting for push message")
+
+    elseif message_id == hash("push_android") then
+        push.register(nil, function (self, token, error)
+            if token then
+                print("Here is the device token:" .. token)
+            else
+                msg.post("/gui#gui", "set_message", { text = "Push error: " .. error.error })
+            end
+        end)
+        push.set_listener(listener)
+        set_text("Waiting for push message")
+
+    elseif message_id == hash("push_local") then
+        -- Schedule a local push in 5 seconds
+        local payload = '{"data":{"field":"Some value","field2":"Other value"}}'
+        self.id, err = push.schedule(message.delay, "A notification!", "Hello there", payload, { action = "get going" })
+
+    elseif message_id == hash("push_get") then
+        if self.id == nil then
+            set_text("No local push notification sent!")
+            set_payload(table.tostring({}))
+            return
+        end
+
+        t, err = push.get_scheduled(self.id)
+        if t == nil then
+            self.id = nil
+            set_text("No local push notification sent!")
+            set_payload(table.tostring({}))
+            return
+        end
+
+        set_text(string.format("push.get_scheduled(%d)", self.id and self.id or "nil"))
+        set_payload(table.tostring(t))
+
+    elseif message_id == hash("push_get_all") then
+        if self.id == nil then
+            set_text("No local push notification sent!")
+        end
+        t, err = push.get_all_scheduled()
+
+        set_text("push.get_all_scheduled()")
+        set_payload(table.tostring(t))
+
+    elseif message_id == hash("push_cancel") then
+
+        s = "cancelled:"
+        notifications, err = push.get_all_scheduled()
+        for id, v in pairs(notifications) do
+
+            s = s .. "\n" .. tostring(id)
+            push.cancel(id)
+
+            if message.all ~= true then
+                break
+            end
+        end
+
+        set_text("push.cancel()")
+        set_payload(s)
+        print("PUSH:\n" .. s)
+
+-- mawe
+    end
+end
+
+function on_reload(self)
+--		pprint(push.get_all_scheduled())
+end

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="{{android.package}}">
+    <uses-sdk android:minSdkVersion="9"/>
+    <application>
+
+        <activity android:name="com.dynamo.android.DefoldActivity">
+            {{#android.push_field_title}}
+            <meta-data
+                android:name="com.defold.push.field_title"
+                android:value="{{android.push_field_title}}" />
+            {{/android.push_field_title}}
+            {{#android.push_field_text}}
+            <meta-data
+                android:name="com.defold.push.field_text"
+                android:value="{{android.push_field_text}}" />
+            {{/android.push_field_text}}
+        </activity>
+
+        <!-- For Local Notifications -->
+        <receiver android:name="com.defold.push.LocalNotificationReceiver" >
+        </receiver>
+
+        <!-- For local and Firebase notifications -->
+        <activity android:name="com.defold.push.PushDispatchActivity"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleTask"
+            android:configChanges="keyboardHidden|orientation|screenSize">
+            <intent-filter>
+                <action android:name="com.defold.push.FORWARD" />
+                <category android:name="com.defold.push" />
+            </intent-filter>
+        </activity>
+
+        <!-- For Firebase Cloud Messaging -->
+        <service android:enabled="true" android:exported="true" android:name="com.defold.push.FirebaseMessagingService">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
+        <service android:exported="true" android:name="com.google.firebase.messaging.FirebaseMessagingService">
+            <intent-filter android:priority="-500">
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
+        <service android:exported="false" android:name="com.google.firebase.components.ComponentDiscoveryService">
+            <meta-data android:name="com.google.firebase.components:com.google.firebase.analytics.connector.internal.AnalyticsConnectorRegistrar" android:value="com.google.firebase.components.ComponentRegistrar"/>
+            <meta-data android:name="com.google.firebase.components:com.google.firebase.iid.Registrar" android:value="com.google.firebase.components.ComponentRegistrar"/>
+        </service>
+        <receiver android:exported="true" android:name="com.google.firebase.iid.FirebaseInstanceIdReceiver" android:permission="com.google.android.c2dm.permission.SEND">
+            <intent-filter>
+                <action android:name="com.google.android.c2dm.intent.RECEIVE"/>
+            </intent-filter>
+        </receiver>
+
+    </application>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <!-- For GCM (push) -->
+    <uses-permission android:name="android.permission.GET_ACCOUNTS" />
+    <uses-permission android:name="com.google.android.c2dm.permission.RECEIVE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+</manifest>
