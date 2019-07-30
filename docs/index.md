@@ -4,7 +4,7 @@ layout: default
 ## Modules
 {% for item in site.data.api %}
 ### <code>{{ item.name }}</code>
-{{ item.desc }}
+{% include description.md desc=item.desc %}
 {% endfor %}
 
 ## Enums
@@ -15,7 +15,7 @@ layout: default
         {% if item.type contains 'number' %}
         <tr>
             <td><strong>{{ module.name }}.{{ item.name }}</strong></td>
-            <td>{{ item.desc | markdownify | replace: "[icon:attention]","<br><br>⚠️"}}</td>
+            <td>{% include description.md desc=item.desc %}</td>
         </tr>
 
         {% endif %}
@@ -34,7 +34,7 @@ layout: default
         {% if item.type contains 'function' %}
         <tr>
             <td><a href="#{{ item.name | url_encode }}"><strong>{{ module.name }}.{{ item.name }}()</strong></a></td>
-            <td>{{ item.desc | truncate: 80 }}</td>
+            <td>{% include description.md desc=item.desc %}</td>
         </tr>
         {% endif %}
     {% endfor %}
@@ -66,7 +66,7 @@ layout: default
                 {% endif %}
             </td>
             <td><code>{{ param.type }}</code></td>
-            <td>{{ param.desc | markdownify }}
+            <td>{% include description.md desc=param.desc %}
                 {% if param.type == "function" %}
                 {% include type-function.md params=param.parameters %}
                 {% endif %}
@@ -94,13 +94,13 @@ layout: default
                 <tr>
                     <td>{{ return.name }}</td>
                     <td><code class="inline-code-block">{{ return.type }}</code></td>
-                    <td>{{ return.desc | markdownify }}</td>
+                    <td>{% include description.md desc=return.desc %}</td>
                 </tr>
             {% endfor %}
         </tbody>
     </table>
 {% endif %}
-{{ function.desc | markdownify | replace: "[icon:attention]","<br><br>⚠️" | replace: "[type:string]","<code class='inline-code-block'>string</code>" | replace: "[type:number]","<code class='inline-code-block'>number</code>" | replace: "[type:table]","<code class='inline-code-block'>table</code>" | markdownify}}
+{% include description.md desc=function.desc %}
 
 {% if function.examples %}
 <h4>Examples</h4>
