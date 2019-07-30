@@ -681,9 +681,6 @@ static int InvokeCallback(Command* cmd)
     if (cmd->m_Data2) {
         free(cmd->m_Data2);
     }
-    else {
-        dmLogFatal("read error in callback");
-    }
     return 1;
 }
 
