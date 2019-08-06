@@ -2,7 +2,9 @@
 
 This is a Defold [native extension](https://www.defold.com/manuals/extensions/) which provides access to Push Notifications functionality on iOs and Android devices.
 
-To learn more please visit the [documentation page](https://defold.github.io/extension-push/) for this extension. 
+To learn more please visit the [documentation page](https://defold.github.io/extension-push/) for this extension.
+
+[The manual](https://www.defold.com/manuals/push/) is available on the official Defold site.
 
 ---
 
