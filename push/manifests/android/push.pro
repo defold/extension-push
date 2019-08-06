@@ -1,0 +1,8 @@
+-keep public class com.google.firebase.**
+-keep public class com.google.firebase.FirebaseApp
+-keep public class com.google.firebase.FirebaseOptions
+-keep public class com.google.firebase.iid.FirebaseInstanceId
+-keep public class com.google.firebase.iid.InstanceIdResult
+-keep public class com.google.firebase.messaging.RemoteMessage
+-dontwarn com.google.firebase.messaging.R
+-dontwarn com.google.firebase.messaging.R$*

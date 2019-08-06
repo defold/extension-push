@@ -1,1 +1,6 @@
 name: PushExtExternal
+
+platforms:
+    android:
+        bundle:
+            aaptExtraPackages: ['com.google.firebase']
