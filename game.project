@@ -17,7 +17,7 @@ proguard = /builtins/manifests/android/dmengine.pro
 
 [project]
 title = extension-push
-dependencies = 
+dependencies = https://github.com/defold/extension-firebase-core/archive/master.zip
 
 [library]
 include_dirs = push
