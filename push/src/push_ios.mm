@@ -131,9 +131,10 @@ static void RunCallback(lua_State* L, int cb, int self, NSData* deviceToken, NSE
         lua_pushnil(L);
     }
 
-    int ret = dmScript::PCall(L, 3, 0);
+    int ret = lua_pcall(L, 3, 0, 0);
     if (ret != 0) {
         dmLogError("Error running push callback");
+        lua_pop(L, 1);
     }
 
     g_Push.m_L = 0;
@@ -215,9 +216,10 @@ static void RunListener(NSDictionary *userdata, bool local, bool wasActivated)
 
         lua_pushboolean(L, wasActivated);
 
-        int ret = dmScript::PCall(L, 4, 0);
+        int ret = lua_pcall(L, 4, 0, 0);
         if (ret != 0) {
             dmLogError("Error running push callback");
+            lua_pop(L, 1);
         }
         assert(top == lua_gettop(L));
     } else {

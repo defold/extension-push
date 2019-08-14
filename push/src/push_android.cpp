@@ -243,7 +243,7 @@ static int Push_Schedule(lua_State* L)
     ScheduledNotification sn;
 
     // Use the current time to create a unique identifier. It should be unique between sessions
-    sn.id = (int32_t) dmHashBufferNoReverse32(&t, (uint32_t)sizeof(t));
+    sn.id = (int32_t) (dmHashBuffer64(&t, (uint32_t)sizeof(t)) & 0xFFFFFFFF);
     if (sn.id < 0) {
         sn.id = -sn.id; // JNI doesn't support unsigned int
     }
@@ -593,7 +593,11 @@ void HandleRegistrationResult(const Command* cmd)
         dmLogError("GCM error %s", (const char*) cmd->m_Data2);
     }
 
-    dmScript::PCall(L, 3, 0);
+    int ret = lua_pcall(L, 3, 0, 0);
+    if (ret != 0) {
+        dmLogError("Error running push callback");
+        lua_pop(L, 1);
+    }
 
     dmScript::Unref(L, LUA_REGISTRYINDEX, g_Push.m_Callback);
     dmScript::Unref(L, LUA_REGISTRYINDEX, g_Push.m_Self);
@@ -647,7 +651,11 @@ void HandlePushMessageResult(const Command* cmd, bool local)
 
         lua_pushboolean(L, cmd->m_WasActivated);
 
-        dmScript::PCall(L, 4, 0);
+        int ret = lua_pcall(L, 4, 0, 0);
+        if (ret != 0) {
+            dmLogError("Error running push callback");
+            lua_pop(L, 1);
+        }
     } else {
         lua_pop(L, 2);
         dmLogError("Failed to parse push response (%d)", r);
@@ -754,6 +762,7 @@ static dmExtension::Result UpdatePush(dmExtension::Params* params)
         InvokeCallback(cmd);
         m_commandsQueue.EraseSwap(i--);
     }
+    return dmExtension::RESULT_OK;
 }
 
 static dmExtension::Result AppFinalizePush(dmExtension::AppParams* params)

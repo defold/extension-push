@@ -2,7 +2,7 @@
 #ifndef DM_PUSH_UTILS
 #define DM_PUSH_UTILS
 
-#include <script/script.h>
+#include <dmsdk/sdk.h>
 
 #define DM_PUSH_EXTENSION_ORIGIN_REMOTE 0
 #define DM_PUSH_EXTENSION_ORIGIN_LOCAL  1
