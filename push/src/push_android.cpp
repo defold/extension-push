@@ -1,6 +1,7 @@
 #if defined(DM_PLATFORM_ANDROID)
 #include <jni.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <dmsdk/sdk.h>
 #include "push_utils.h"
 
