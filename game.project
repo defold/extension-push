@@ -20,7 +20,7 @@ title = extension-push
 dependencies = https://github.com/defold/extension-firebase-core/archive/master.zip,https://github.com/defold/extension-gps/archive/master.zip
 
 [library]
-include_dirs = push
+include_dirs = extension-push
 
 [ios]
 bundle_identifier = com.defoldextension.push
