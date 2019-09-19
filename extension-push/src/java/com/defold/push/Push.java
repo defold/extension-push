@@ -334,6 +334,14 @@ public class Push {
     }
 
     private void registerFirebase(Activity activity) {
+        if (this.applicationIdFCM == null || this.applicationIdFCM == "") {
+            Log.w(Push.TAG, "Fcm Application Id must be set.");
+            return;
+        }
+        if (this.senderIdFCM == null || this.senderIdFCM == "") {
+            Log.w(Push.TAG, "Gcm Sender Id must be set.");
+            return;
+        }
         FirebaseOptions.Builder builder = new FirebaseOptions.Builder()
             .setApplicationId(this.applicationIdFCM)
             .setGcmSenderId(this.senderIdFCM);

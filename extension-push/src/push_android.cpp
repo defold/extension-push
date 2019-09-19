@@ -79,7 +79,6 @@ struct Push
     int                  m_Self;
     lua_State*           m_L;
     PushListener         m_Listener;
-    int                  m_Pipefd[2];
 
     jobject              m_Push;
     jobject              m_PushJNI;
