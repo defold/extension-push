@@ -15,14 +15,10 @@ struct Push;
 
 struct Command
 {
-    Command()
-    {
-        memset(this, 0, sizeof(*this));
-    }
     uint32_t m_Command;
     int32_t  m_ResponseCode;
-    void*    m_Data1;
-    void*    m_Data2;
+    char*    m_Data1;
+    char*    m_Data2;
     bool     m_WasActivated;
 };
 
@@ -500,6 +496,8 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onRegistration(JNIEnv* env, 
 
     Command cmd;
     cmd.m_Command = CMD_REGISTRATION_RESULT;
+    cmd.m_Data1 = 0;
+    cmd.m_Data2 = 0;
     if (ri) {
         cmd.m_Data1 = strdup(ri);
         env->ReleaseStringUTFChars(regId, ri);
@@ -524,6 +522,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onMessage(JNIEnv* env, jobje
     Command cmd;
     cmd.m_Command = CMD_PUSH_MESSAGE_RESULT;
     cmd.m_Data1 = strdup(j);
+    cmd.m_Data2 = 0;
     cmd.m_WasActivated = wasActivated;
     add_to_queue(cmd);
     if (j)
@@ -547,6 +546,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onLocalMessage(JNIEnv* env, 
     Command cmd;
     cmd.m_Command = CMD_LOCAL_MESSAGE_RESULT;
     cmd.m_Data1 = strdup(j);
+    cmd.m_Data2 = 0;
     cmd.m_WasActivated = wasActivated;
     add_to_queue(cmd);
     if (j)
@@ -559,7 +559,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onLocalMessage(JNIEnv* env, 
 }
 #endif
 
-void HandleRegistrationResult(const Command* cmd)
+static void HandleRegistrationResult(const Command* cmd)
 {
     if (g_Push.m_Callback == LUA_NOREF) {
         dmLogError("No callback set");
@@ -607,7 +607,7 @@ void HandleRegistrationResult(const Command* cmd)
     assert(top == lua_gettop(L));
 }
 
-void HandlePushMessageResult(const Command* cmd, bool local)
+static void HandlePushMessageResult(const Command* cmd, bool local)
 {
     if (g_Push.m_Listener.m_Callback == LUA_NOREF) {
         dmLogError("No callback set");
