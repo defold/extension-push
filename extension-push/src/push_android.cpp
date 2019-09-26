@@ -94,15 +94,15 @@ struct Push
 
 Push g_Push;
 
-static void add_to_queue(Command cmd)
+static void add_to_queue(Command* cmd)
 {
     DM_MUTEX_SCOPED_LOCK(m_mutex);
     
     if(m_commandsQueue.Full())
     {
-        m_commandsQueue.OffsetCapacity(1);
+        m_commandsQueue.OffsetCapacity(2);
     }
-    m_commandsQueue.Push(cmd);
+    m_commandsQueue.Push(*cmd);
 }
 
 static void VerifyCallback(lua_State* L)
@@ -508,7 +508,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onRegistration(JNIEnv* env, 
         cmd.m_Data2 = strdup(em);
         env->ReleaseStringUTFChars(errorMessage, em);
     }
-    add_to_queue(cmd);
+    add_to_queue(&cmd);
 }
 
 
@@ -525,7 +525,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onMessage(JNIEnv* env, jobje
     cmd.m_Command = CMD_PUSH_MESSAGE_RESULT;
     cmd.m_Data1 = strdup(j);
     cmd.m_WasActivated = wasActivated;
-    add_to_queue(cmd);
+    add_to_queue(&cmd);
     if (j)
     {
         env->ReleaseStringUTFChars(json, j);
@@ -548,7 +548,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onLocalMessage(JNIEnv* env, 
     cmd.m_Command = CMD_LOCAL_MESSAGE_RESULT;
     cmd.m_Data1 = strdup(j);
     cmd.m_WasActivated = wasActivated;
-    add_to_queue(cmd);
+    add_to_queue(&cmd);
     if (j)
     {
         env->ReleaseStringUTFChars(json, j);
@@ -665,33 +665,6 @@ static void HandlePushMessageResult(const Command* cmd, bool local)
     assert(top == lua_gettop(L));
 }
 
-static int InvokeCallback(Command* cmd)
-{
-    switch (cmd->m_Command)
-    {
-    case CMD_REGISTRATION_RESULT:
-        HandleRegistrationResult(cmd);
-        break;
-    case CMD_PUSH_MESSAGE_RESULT:
-        HandlePushMessageResult(cmd, false);
-        break;
-    case CMD_LOCAL_MESSAGE_RESULT:
-        HandlePushMessageResult(cmd, true);
-        break;
-
-    default:
-        assert(false);
-    }
-
-    if (cmd->m_Data1) {
-        free(cmd->m_Data1);
-    }
-    if (cmd->m_Data2) {
-        free(cmd->m_Data2);
-    }
-    return 1;
-}
-
 static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
 {
     m_mutex = dmMutex::New();
@@ -758,8 +731,29 @@ static dmExtension::Result UpdatePush(dmExtension::Params* params)
 
     for(uint32_t i = 0; i != m_commandsQueue.Size(); ++i)
     {
-        Command* cmd = &m_commandsQueue[i];
-        InvokeCallback(cmd);
+        Command& cmd = m_commandsQueue[i];
+        switch (cmd.m_Command)
+        {
+        case CMD_REGISTRATION_RESULT:
+            HandleRegistrationResult(&cmd);
+            break;
+        case CMD_PUSH_MESSAGE_RESULT:
+            HandlePushMessageResult(&cmd, false);
+            break;
+        case CMD_LOCAL_MESSAGE_RESULT:
+            HandlePushMessageResult(&cmd, true);
+            break;
+
+        default:
+            assert(false);
+        }
+
+        if (cmd.m_Data1) {
+            free(cmd.m_Data1);
+        }
+        if (cmd.m_Data2) {
+            free(cmd.m_Data2);
+        }
     }
     m_commandsQueue.SetSize(0);
     return dmExtension::RESULT_OK;
@@ -784,6 +778,9 @@ static dmExtension::Result AppFinalizePush(dmExtension::AppParams* params)
 
 static dmExtension::Result InitializePush(dmExtension::Params* params)
 {
+
+    m_commandsQueue.SetCapacity(2);
+
     lua_State*L = params->m_L;
     int top = lua_gettop(L);
     luaL_register(L, LIB_NAME, Push_methods);
