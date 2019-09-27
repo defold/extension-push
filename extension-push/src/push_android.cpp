@@ -94,7 +94,7 @@ struct Push
 
 static Push g_Push;
 
-static void add_to_queue(PushCommand* cmd)
+static void QueueCommand(PushCommand* cmd)
 {
     DM_MUTEX_SCOPED_LOCK(g_Push.m_Mutex);
     
@@ -508,7 +508,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onRegistration(JNIEnv* env, 
         cmd.m_Data2 = strdup(em);
         env->ReleaseStringUTFChars(errorMessage, em);
     }
-    add_to_queue(&cmd);
+    QueueCommand(&cmd);
 }
 
 
@@ -525,7 +525,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onMessage(JNIEnv* env, jobje
     cmd.m_Command = CMD_PUSH_MESSAGE_RESULT;
     cmd.m_Data1 = strdup(j);
     cmd.m_WasActivated = wasActivated;
-    add_to_queue(&cmd);
+    QueueCommand(&cmd);
     if (j)
     {
         env->ReleaseStringUTFChars(json, j);
@@ -548,7 +548,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onLocalMessage(JNIEnv* env, 
     cmd.m_Command = CMD_LOCAL_MESSAGE_RESULT;
     cmd.m_Data1 = strdup(j);
     cmd.m_WasActivated = wasActivated;
-    add_to_queue(&cmd);
+    QueueCommand(&cmd);
     if (j)
     {
         env->ReleaseStringUTFChars(json, j);
