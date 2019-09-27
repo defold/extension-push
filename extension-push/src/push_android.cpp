@@ -13,11 +13,11 @@ struct Push;
 #define CMD_PUSH_MESSAGE_RESULT  (1)
 #define CMD_LOCAL_MESSAGE_RESULT (2)
 
-struct Command
+struct PushCommand
 {
-    Command()       
+    PushCommand()       
     {      
-        memset(this, 0, sizeof(*this));
+        memset(this, 0, sizeof(PushCommand));
     }
     uint32_t m_Command;
     int32_t  m_ResponseCode;
@@ -25,9 +25,6 @@ struct Command
     void*    m_Data2;
     bool     m_WasActivated;
 };
-
-static dmArray<Command>    m_commandsQueue;
-static dmMutex::HMutex     m_mutex;
 
 static JNIEnv* Attach()
 {
@@ -89,20 +86,23 @@ struct Push
     jmethodID            m_Schedule;
     jmethodID            m_Cancel;
 
+    dmArray<PushCommand> m_CommandsQueue;
+    dmMutex::HMutex      m_Mutex;
+
     dmArray<ScheduledNotification> m_ScheduledNotifications;
 };
 
-Push g_Push;
+static Push g_Push;
 
-static void add_to_queue(Command* cmd)
+static void add_to_queue(PushCommand* cmd)
 {
-    DM_MUTEX_SCOPED_LOCK(m_mutex);
+    DM_MUTEX_SCOPED_LOCK(g_Push.m_Mutex);
     
-    if(m_commandsQueue.Full())
+    if(g_Push.m_CommandsQueue.Full())
     {
-        m_commandsQueue.OffsetCapacity(2);
+        g_Push.m_CommandsQueue.OffsetCapacity(2);
     }
-    m_commandsQueue.Push(*cmd);
+    g_Push.m_CommandsQueue.Push(*cmd);
 }
 
 static void VerifyCallback(lua_State* L)
@@ -498,7 +498,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onRegistration(JNIEnv* env, 
         em = env->GetStringUTFChars(errorMessage, 0);
     }
 
-    Command cmd;
+    PushCommand cmd;
     cmd.m_Command = CMD_REGISTRATION_RESULT;
     if (ri) {
         cmd.m_Data1 = strdup(ri);
@@ -521,7 +521,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onMessage(JNIEnv* env, jobje
         j = env->GetStringUTFChars(json, 0);
     }
 
-    Command cmd;
+    PushCommand cmd;
     cmd.m_Command = CMD_PUSH_MESSAGE_RESULT;
     cmd.m_Data1 = strdup(j);
     cmd.m_WasActivated = wasActivated;
@@ -544,7 +544,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onLocalMessage(JNIEnv* env, 
     // keeping track of local notifications, need to remove from internal list
     RemoveNotification(id);
 
-    Command cmd;
+    PushCommand cmd;
     cmd.m_Command = CMD_LOCAL_MESSAGE_RESULT;
     cmd.m_Data1 = strdup(j);
     cmd.m_WasActivated = wasActivated;
@@ -559,7 +559,7 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onLocalMessage(JNIEnv* env, 
 }
 #endif
 
-static void HandleRegistrationResult(const Command* cmd)
+static void HandleRegistrationResult(const PushCommand* cmd)
 {
     if (g_Push.m_Callback == LUA_NOREF) {
         dmLogError("No callback set");
@@ -607,7 +607,7 @@ static void HandleRegistrationResult(const Command* cmd)
     assert(top == lua_gettop(L));
 }
 
-static void HandlePushMessageResult(const Command* cmd, bool local)
+static void HandlePushMessageResult(const PushCommand* cmd, bool local)
 {
     if (g_Push.m_Listener.m_Callback == LUA_NOREF) {
         dmLogError("No callback set");
@@ -667,7 +667,8 @@ static void HandlePushMessageResult(const Command* cmd, bool local)
 
 static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
 {
-    m_mutex = dmMutex::New();
+    g_Push.m_Mutex = dmMutex::New();
+    g_Push.m_CommandsQueue.SetCapacity(2);
     JNIEnv* env = Attach();
 
     jclass activity_class = env->FindClass("android/app/NativeActivity");
@@ -722,16 +723,16 @@ static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
 
 static dmExtension::Result UpdatePush(dmExtension::Params* params)
 {
-    if (m_commandsQueue.Empty())
+    if (g_Push.m_CommandsQueue.Empty())
     {
         return dmExtension::RESULT_OK;
     }
 
-    DM_MUTEX_SCOPED_LOCK(m_mutex);
+    DM_MUTEX_SCOPED_LOCK(g_Push.m_Mutex);
 
-    for(uint32_t i = 0; i != m_commandsQueue.Size(); ++i)
+    for(uint32_t i = 0; i != g_Push.m_CommandsQueue.Size(); ++i)
     {
-        Command& cmd = m_commandsQueue[i];
+        PushCommand& cmd = g_Push.m_CommandsQueue[i];
         switch (cmd.m_Command)
         {
         case CMD_REGISTRATION_RESULT:
@@ -755,13 +756,13 @@ static dmExtension::Result UpdatePush(dmExtension::Params* params)
             free(cmd.m_Data2);
         }
     }
-    m_commandsQueue.SetSize(0);
+    g_Push.m_CommandsQueue.SetSize(0);
     return dmExtension::RESULT_OK;
 }
 
 static dmExtension::Result AppFinalizePush(dmExtension::AppParams* params)
 {
-    dmMutex::Delete(m_mutex);
+    dmMutex::Delete(g_Push.m_Mutex);
     JNIEnv* env = Attach();
     env->CallVoidMethod(g_Push.m_Push, g_Push.m_Stop);
     env->DeleteGlobalRef(g_Push.m_Push);
@@ -779,7 +780,7 @@ static dmExtension::Result AppFinalizePush(dmExtension::AppParams* params)
 static dmExtension::Result InitializePush(dmExtension::Params* params)
 {
 
-    m_commandsQueue.SetCapacity(2);
+    g_Push.m_CommandsQueue.SetCapacity(2);
 
     lua_State*L = params->m_L;
     int top = lua_gettop(L);
