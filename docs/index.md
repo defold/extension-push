@@ -1,115 +1,34 @@
 ---
 layout: default
 ---
-## Modules
-{% for item in site.data.api %}
-### <code>{{ item.name }}</code>
-{% include description.md desc=item.desc %}
-{% endfor %}
 
-## Enums
-<table>
-    <tbody>
-{% for module in site.data.api %}
-    {% for item in module.members %}
-        {% if item.type contains 'number' %}
-        <tr>
-            <td><strong>{{ module.name }}.{{ item.name }}</strong></td>
-            <td>{% include description.md desc=item.desc %}</td>
-        </tr>
+# Defold Push API documentation
 
-        {% endif %}
-    {% endfor %}
-{% endfor %}
-    </tbody>
-</table>
+Functions for interacting with push notifications. Supported on iOS and Android.
 
-<hr>
+# Usage
+To use this library in your Defold project, add the following URL to your <code class="inline-code-block">game.project</code> dependencies:
 
-## Functions
-<table>
-    <tbody>
-{% for module in site.data.api %}
-    {% for item in module.members %}
-        {% if item.type contains 'function' %}
-        <tr>
-            <td><a href="#{{ item.name | url_encode }}"><strong>{{ module.name }}.{{ item.name }}()</strong></a></td>
-            <td>{% include description.md desc=item.desc %}</td>
-        </tr>
-        {% endif %}
-    {% endfor %}
-{% endfor %}
-    </tbody>
-</table>
+    https://github.com/defold/extension-push/archive/master.zip
 
-{% for module in site.data.api %}
-    {% for function in module.members %}
-        {% if function.type contains 'function' %}
-<div class="function-wrap">
-<h3 class="function-header"><a href="#{{ function.name | url_encode }}" id="{{ function.name | url_encode }}"><code>{{ module.name }}.{{ function.name }}({% for param in function.parameters %}{{param.name}}{% unless forloop.last %}, {% endunless %}{% endfor %})</code></a></h3>
-{% if function.parameters %}
-<table>
-    <thead>
-        <tr>
-            <th>Parameter</th>
-            <th>Type</th>
-            <th>Description</th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for param in function.parameters %}
-        <tr>
-            <td style="text-align: right;">
-                <strong>{{ param.name }}</strong>
-                {% if param.optional %}
-                    (optional)
-                {% endif %}
-            </td>
-            <td><code>{{ param.type }}</code></td>
-            <td>{% include description.md desc=param.desc %}
-                {% if param.type == "function" %}
-                {% include type-function.md params=param.parameters %}
-                {% endif %}
-                {% if param.type == "table" %}
-                {% include type-table.md fields=param.members %}
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% endif %}
-{% if function.returns %}
-    <table>
-        <thead>
-            <tr>
-                <th>Return value</th>
-                <th>Type</th>
-                <th>Description</th>
-            </tr>
-        </thead>
-        <tbody>
-            <h4>Returns</h4>
-            {% for return in function.returns %}
-                <tr>
-                    <td>{{ return.name }}</td>
-                    <td><code class="inline-code-block">{{ return.type }}</code></td>
-                    <td>{% include description.md desc=return.desc %}</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-{% endif %}
-{% include description.md desc=function.desc %}
+We recommend using a link to a zip file of a [https://github.com/defold/extension-push/releases](specific release).
 
-{% if function.examples %}
-<h4>Examples</h4>
-{% for example in function.examples %}
-{{ example.desc | markdownify }}
-{% endfor %}
-{% endif %}
-</div>
+# Dependencies
 
-        {% endif %}
-    {% endfor %}
-{% endfor %}
+The extension has the following dependencies:
+
+    https://github.com/defold/android-base-extensions/releases/download/1.0.0/firebase-core-16.0.8.zip
+    https://github.com/defold/android-base-extensions/releases/download/1.0.0/firebase-messaging-17.3.4.zip
+    https://github.com/defold/android-base-extensions/releases/download/1.0.0/gps-base-16.0.1.zip
+    https://github.com/defold/android-base-extensions/releases/download/1.0.0/gps-measurement-16.4.0.zip
+    https://github.com/defold/android-base-extensions/releases/download/1.0.0/support-v4-26.1.0.zip
+
+
+## Source code
+
+The source code is available on [GitHub](https://github.com/defold/extension-push)
+
+
+# API reference
+
+{% include api_ref.md %}
