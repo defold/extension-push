@@ -57,7 +57,7 @@ struct Push
             [m_SavedNotification release];
         }
         m_SavedNotification = 0;
-        m_SavedNotificationOrigin = DM_PUSH_EXTENSION_ORIGIN_LOCAL;
+        m_SavedNotificationOrigin = dmPush::ORIGIN_LOCAL;
         m_SavedWasActivated = false;
         m_ScheduledID = -1;
     }
@@ -207,11 +207,11 @@ static void RunListener(NSDictionary *userdata, bool local, bool wasActivated)
             }
             dmJson::Free(&doc);
 
-            lua_pushnumber(L, DM_PUSH_EXTENSION_ORIGIN_LOCAL);
+            lua_pushnumber(L, dmPush::ORIGIN_LOCAL);
 
         } else {
             ObjCToLua(L, userdata);
-            lua_pushnumber(L, DM_PUSH_EXTENSION_ORIGIN_REMOTE);
+            lua_pushnumber(L, dmPush::ORIGIN_REMOTE);
         }
 
         lua_pushboolean(L, wasActivated);
@@ -232,7 +232,7 @@ static void RunListener(NSDictionary *userdata, bool local, bool wasActivated)
         // Save notification as push.set_listener may not be set at this point, e.g. when launching the app
         // but clicking on the notification
         g_Push.m_SavedNotification = [[NSDictionary alloc] initWithDictionary:userdata copyItems:YES];
-        g_Push.m_SavedNotificationOrigin = (local ? DM_PUSH_EXTENSION_ORIGIN_LOCAL : DM_PUSH_EXTENSION_ORIGIN_REMOTE);
+        g_Push.m_SavedNotificationOrigin = (local ? dmPush::ORIGIN_LOCAL : dmPush::ORIGIN_REMOTE);
         g_Push.m_SavedWasActivated = wasActivated;
     }
 }
@@ -476,7 +476,7 @@ int Push_SetListener(lua_State* L)
     push->m_Listener.m_Self = dmScript::Ref(L, LUA_REGISTRYINDEX);
 
     if (g_Push.m_SavedNotification) {
-        RunListener(g_Push.m_SavedNotification, g_Push.m_SavedNotificationOrigin == DM_PUSH_EXTENSION_ORIGIN_LOCAL, g_Push.m_SavedWasActivated);
+        RunListener(g_Push.m_SavedNotification, g_Push.m_SavedNotificationOrigin == dmPush::ORIGIN_LOCAL, g_Push.m_SavedWasActivated);
         [g_Push.m_SavedNotification release];
         g_Push.m_SavedNotification = 0;
     }
@@ -898,8 +898,8 @@ dmExtension::Result InitializePush(dmExtension::Params* params)
     SETCONSTANT(NOTIFICATION_SOUND, UIRemoteNotificationTypeSound);
     SETCONSTANT(NOTIFICATION_ALERT, UIRemoteNotificationTypeAlert);
 
-    SETCONSTANT(ORIGIN_REMOTE, DM_PUSH_EXTENSION_ORIGIN_REMOTE);
-    SETCONSTANT(ORIGIN_LOCAL,  DM_PUSH_EXTENSION_ORIGIN_LOCAL);
+    SETCONSTANT(ORIGIN_REMOTE, dmPush::ORIGIN_REMOTE);
+    SETCONSTANT(ORIGIN_LOCAL,  dmPush::ORIGIN_LOCAL);
 
 #undef SETCONSTANT
 

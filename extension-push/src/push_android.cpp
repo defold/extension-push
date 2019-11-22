@@ -7,25 +7,6 @@
 
 #define LIB_NAME "push"
 
-struct Push;
-
-#define CMD_REGISTRATION_RESULT  (0)
-#define CMD_PUSH_MESSAGE_RESULT  (1)
-#define CMD_LOCAL_MESSAGE_RESULT (2)
-
-struct PushCommand
-{
-    PushCommand()       
-    {      
-        memset(this, 0, sizeof(PushCommand));
-    }
-    uint32_t m_Command;
-    int32_t  m_ResponseCode;
-    void*    m_Data1;
-    void*    m_Data2;
-    bool     m_WasActivated;
-};
-
 static JNIEnv* Attach()
 {
     JNIEnv* env;
@@ -48,34 +29,13 @@ struct ScheduledNotification
     int priority;
 };
 
-struct PushListener
-{
-    PushListener()
-    {
-        m_L = 0;
-        m_Callback = LUA_NOREF;
-        m_Self = LUA_NOREF;
-    }
-    lua_State* m_L;
-    int        m_Callback;
-    int        m_Self;
-};
-
 struct Push
 {
     Push()
     {
         memset(this, 0, sizeof(*this));
-        m_Callback = LUA_NOREF;
-        m_Self = LUA_NOREF;
-        m_Listener.m_Callback = LUA_NOREF;
-        m_Listener.m_Self = LUA_NOREF;
         m_ScheduledNotifications.SetCapacity(8);
     }
-    int                  m_Callback;
-    int                  m_Self;
-    lua_State*           m_L;
-    PushListener         m_Listener;
 
     jobject              m_Push;
     jobject              m_PushJNI;
@@ -86,75 +46,40 @@ struct Push
     jmethodID            m_Schedule;
     jmethodID            m_Cancel;
 
-    dmArray<PushCommand> m_CommandsQueue;
-    dmMutex::HMutex      m_Mutex;
+    dmScript::LuaCallbackInfo* m_Callback;
+    dmScript::LuaCallbackInfo* m_Listener;
+    dmPush::CommandQueue m_CommandQueue;
 
     dmArray<ScheduledNotification> m_ScheduledNotifications;
 };
 
 static Push g_Push;
 
-static void QueueCommand(PushCommand* cmd)
-{
-    DM_MUTEX_SCOPED_LOCK(g_Push.m_Mutex);
-    
-    if(g_Push.m_CommandsQueue.Full())
-    {
-        g_Push.m_CommandsQueue.OffsetCapacity(2);
-    }
-    g_Push.m_CommandsQueue.Push(*cmd);
-}
-
-static void VerifyCallback(lua_State* L)
-{
-    if (g_Push.m_Callback != LUA_NOREF) {
-        dmLogError("Unexpected callback set");
-        dmScript::Unref(L, LUA_REGISTRYINDEX, g_Push.m_Callback);
-        dmScript::Unref(L, LUA_REGISTRYINDEX, g_Push.m_Self);
-        g_Push.m_Callback = LUA_NOREF;
-        g_Push.m_Self = LUA_NOREF;
-        g_Push.m_L = 0;
-    }
-}
-
 static int Push_Register(lua_State* L)
 {
-    int top = lua_gettop(L);
-    VerifyCallback(L);
+    DM_LUA_STACK_CHECK(L, 0);
+
+    if (g_Push.m_Callback)
+        dmScript::DestroyCallback(g_Push.m_Callback);
 
     // NOTE: We ignore argument one. Only for iOS
-    luaL_checktype(L, 2, LUA_TFUNCTION);
-    lua_pushvalue(L, 2);
-    g_Push.m_Callback = dmScript::Ref(L, LUA_REGISTRYINDEX);
-    dmScript::GetInstance(L);
-    g_Push.m_Self = dmScript::Ref(L, LUA_REGISTRYINDEX);
-    g_Push.m_L = dmScript::GetMainThread(L);
+    g_Push.m_Callback = dmScript::CreateCallback(L, 2);
 
     JNIEnv* env = Attach();
     env->CallVoidMethod(g_Push.m_Push, g_Push.m_Register, dmGraphics::GetNativeAndroidActivity());
     Detach();
 
-    assert(top == lua_gettop(L));
     return 0;
 }
 
 static int Push_SetListener(lua_State* L)
 {
-    Push* push = &g_Push;
-    luaL_checktype(L, 1, LUA_TFUNCTION);
-    lua_pushvalue(L, 1);
-    int cb = dmScript::Ref(L, LUA_REGISTRYINDEX);
+    DM_LUA_STACK_CHECK(L, 0);
 
-    if (push->m_Listener.m_Callback != LUA_NOREF) {
-        dmScript::Unref(push->m_Listener.m_L, LUA_REGISTRYINDEX, push->m_Listener.m_Callback);
-        dmScript::Unref(push->m_Listener.m_L, LUA_REGISTRYINDEX, push->m_Listener.m_Self);
-    }
+    if (g_Push.m_Listener)
+        dmScript::DestroyCallback(g_Push.m_Listener);
 
-    push->m_Listener.m_L = dmScript::GetMainThread(L);
-    push->m_Listener.m_Callback = cb;
-
-    dmScript::GetInstance(L);
-    push->m_Listener.m_Self = dmScript::Ref(L, LUA_REGISTRYINDEX);
+    g_Push.m_Listener = dmScript::CreateCallback(L, 1);
 
     // Flush stored notifications stored on Java side
     JNIEnv* env = Attach();
@@ -304,6 +229,7 @@ static void RemoveNotification(int id)
 
 static int Push_Cancel(lua_State* L)
 {
+    DM_LUA_STACK_CHECK(L, 0);
     int cancel_id = luaL_checkinteger(L, 1);
 
     for (unsigned int i = 0; i < g_Push.m_ScheduledNotifications.Size(); ++i)
@@ -358,6 +284,8 @@ static void NotificationToLua(lua_State* L, ScheduledNotification notification)
 
 static int Push_GetScheduled(lua_State* L)
 {
+    DM_LUA_STACK_CHECK(L, 0);
+
     int get_id = luaL_checkinteger(L, 1);
     uint64_t cur_time = dmTime::GetTime();
 
@@ -384,6 +312,8 @@ static int Push_GetScheduled(lua_State* L)
 
 static int Push_GetAllScheduled(lua_State* L)
 {
+    DM_LUA_STACK_CHECK(L, 1);
+
     uint64_t cur_time = dmTime::GetTime();
 
     lua_createtable(L, 0, 0);
@@ -424,19 +354,6 @@ static const luaL_reg Push_methods[] =
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-static void PushError(lua_State*L, const char* error)
-{
-    // Could be extended with error codes etc
-    if (error != 0) {
-        lua_newtable(L);
-        lua_pushstring(L, "error");
-        lua_pushstring(L, error);
-        lua_rawset(L, -3);
-    } else {
-        lua_pushnil(L);
-    }
-}
 
 JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_addPendingNotifications(JNIEnv* env, jobject, jint uid, jstring title, jstring message, jstring payload, jlong timestampMillis, jint priority)
 {
@@ -498,17 +415,19 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onRegistration(JNIEnv* env, 
         em = env->GetStringUTFChars(errorMessage, 0);
     }
 
-    PushCommand cmd;
-    cmd.m_Command = CMD_REGISTRATION_RESULT;
+    dmPush::Command cmd;
+    cmd.m_Callback = g_Push.m_Callback;
+    cmd.m_Command = dmPush::COMMAND_TYPE_REGISTRATION_RESULT;
     if (ri) {
-        cmd.m_Data1 = strdup(ri);
+        cmd.m_Result = strdup(ri);
         env->ReleaseStringUTFChars(regId, ri);
     }
     if (em) {
-        cmd.m_Data2 = strdup(em);
+        cmd.m_Error = strdup(em);
         env->ReleaseStringUTFChars(errorMessage, em);
     }
-    QueueCommand(&cmd);
+    dmPush::QueuePush(&g_Push.m_CommandQueue, &cmd);
+    g_Push.m_Callback = 0;
 }
 
 
@@ -521,11 +440,12 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onMessage(JNIEnv* env, jobje
         j = env->GetStringUTFChars(json, 0);
     }
 
-    PushCommand cmd;
-    cmd.m_Command = CMD_PUSH_MESSAGE_RESULT;
-    cmd.m_Data1 = strdup(j);
+    dmPush::Command cmd;
+    cmd.m_Callback = g_Push.m_Listener;
+    cmd.m_Command = dmPush::COMMAND_TYPE_PUSH_MESSAGE_RESULT;
+    cmd.m_Result = strdup(j);
     cmd.m_WasActivated = wasActivated;
-    QueueCommand(&cmd);
+    dmPush::QueuePush(&g_Push.m_CommandQueue, &cmd);
     if (j)
     {
         env->ReleaseStringUTFChars(json, j);
@@ -544,11 +464,12 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onLocalMessage(JNIEnv* env, 
     // keeping track of local notifications, need to remove from internal list
     RemoveNotification(id);
 
-    PushCommand cmd;
-    cmd.m_Command = CMD_LOCAL_MESSAGE_RESULT;
-    cmd.m_Data1 = strdup(j);
+    dmPush::Command cmd;
+    cmd.m_Callback = g_Push.m_Listener;
+    cmd.m_Command = dmPush::COMMAND_TYPE_LOCAL_MESSAGE_RESULT;
+    cmd.m_Result = strdup(j);
     cmd.m_WasActivated = wasActivated;
-    QueueCommand(&cmd);
+    dmPush::QueuePush(&g_Push.m_CommandQueue, &cmd);
     if (j)
     {
         env->ReleaseStringUTFChars(json, j);
@@ -559,116 +480,11 @@ JNIEXPORT void JNICALL Java_com_defold_push_PushJNI_onLocalMessage(JNIEnv* env, 
 }
 #endif
 
-static void HandleRegistrationResult(const PushCommand* cmd)
-{
-    if (g_Push.m_Callback == LUA_NOREF) {
-        dmLogError("No callback set");
-        return;
-    }
-
-    lua_State* L = g_Push.m_L;
-    int top = lua_gettop(L);
-
-    lua_rawgeti(L, LUA_REGISTRYINDEX, g_Push.m_Callback);
-
-    // Setup self
-    lua_rawgeti(L, LUA_REGISTRYINDEX, g_Push.m_Self);
-    lua_pushvalue(L, -1);
-    dmScript::SetInstance(L);
-
-    if (!dmScript::IsInstanceValid(L))
-    {
-        dmLogError("Could not run push callback because the instance has been deleted.");
-        lua_pop(L, 2);
-        assert(top == lua_gettop(L));
-        return;
-    }
-
-    if (cmd->m_Data1) {
-        lua_pushstring(L, (const char*) cmd->m_Data1);
-        lua_pushnil(L);
-    } else {
-        lua_pushnil(L);
-        PushError(L, (const char*) cmd->m_Data2);
-        dmLogError("GCM error %s", (const char*) cmd->m_Data2);
-    }
-
-    int ret = lua_pcall(L, 3, 0, 0);
-    if (ret != 0) {
-        dmLogError("Error running push callback");
-        lua_pop(L, 1);
-    }
-
-    dmScript::Unref(L, LUA_REGISTRYINDEX, g_Push.m_Callback);
-    dmScript::Unref(L, LUA_REGISTRYINDEX, g_Push.m_Self);
-    g_Push.m_Callback = LUA_NOREF;
-    g_Push.m_Self = LUA_NOREF;
-
-    assert(top == lua_gettop(L));
-}
-
-static void HandlePushMessageResult(const PushCommand* cmd, bool local)
-{
-    if (g_Push.m_Listener.m_Callback == LUA_NOREF) {
-        dmLogError("No callback set");
-        return;
-    }
-
-    lua_State* L = g_Push.m_Listener.m_L;
-    int top = lua_gettop(L);
-
-    lua_rawgeti(L, LUA_REGISTRYINDEX, g_Push.m_Listener.m_Callback);
-
-    // Setup self
-    lua_rawgeti(L, LUA_REGISTRYINDEX, g_Push.m_Listener.m_Self);
-    lua_pushvalue(L, -1);
-    dmScript::SetInstance(L);
-
-    if (!dmScript::IsInstanceValid(L))
-    {
-        dmLogError("Could not run push callback because the instance has been deleted.");
-        lua_pop(L, 2);
-        assert(top == lua_gettop(L));
-        return;
-    }
-
-    dmJson::Document doc;
-    dmJson::Result r = dmJson::Parse((const char*) cmd->m_Data1, &doc);
-    if (r == dmJson::RESULT_OK && doc.m_NodeCount > 0) {
-        char err_str[128];
-        if (dmScript::JsonToLua(L, &doc, 0, err_str, sizeof(err_str)) < 0) {
-            dmLogError("Failed converting push result JSON to Lua; %s", err_str);
-            assert(top == lua_gettop(L));
-            dmJson::Free(&doc);
-            return;
-        }
-
-        if (local) {
-            lua_pushnumber(L, DM_PUSH_EXTENSION_ORIGIN_LOCAL);
-        } else {
-            lua_pushnumber(L, DM_PUSH_EXTENSION_ORIGIN_REMOTE);
-        }
-
-        lua_pushboolean(L, cmd->m_WasActivated);
-
-        int ret = lua_pcall(L, 4, 0, 0);
-        if (ret != 0) {
-            dmLogError("Error running push callback");
-            lua_pop(L, 1);
-        }
-    } else {
-        lua_pop(L, 2);
-        dmLogError("Failed to parse push response (%d)", r);
-    }
-    dmJson::Free(&doc);
-
-    assert(top == lua_gettop(L));
-}
 
 static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
 {
-    g_Push.m_Mutex = dmMutex::New();
-    g_Push.m_CommandsQueue.SetCapacity(2);
+    dmPush::QueueCreate(&g_Push.m_CommandQueue);
+
     JNIEnv* env = Attach();
 
     jclass activity_class = env->FindClass("android/app/NativeActivity");
@@ -691,7 +507,7 @@ static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
     g_Push.m_Register = env->GetMethodID(push_class, "register", "(Landroid/app/Activity;)V");
     g_Push.m_Schedule = env->GetMethodID(push_class, "scheduleNotification", "(Landroid/app/Activity;IJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V");
     g_Push.m_Cancel = env->GetMethodID(push_class, "cancelNotification", "(Landroid/app/Activity;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V");
-    
+
     jmethodID get_instance_method = env->GetStaticMethodID(push_class, "getInstance", "()Lcom/defold/push/Push;");
     g_Push.m_Push = env->NewGlobalRef(env->CallStaticObjectMethod(push_class, get_instance_method));
 
@@ -723,46 +539,12 @@ static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
 
 static dmExtension::Result UpdatePush(dmExtension::Params* params)
 {
-    if (g_Push.m_CommandsQueue.Empty())
-    {
-        return dmExtension::RESULT_OK;
-    }
-
-    DM_MUTEX_SCOPED_LOCK(g_Push.m_Mutex);
-
-    for(uint32_t i = 0; i != g_Push.m_CommandsQueue.Size(); ++i)
-    {
-        PushCommand& cmd = g_Push.m_CommandsQueue[i];
-        switch (cmd.m_Command)
-        {
-        case CMD_REGISTRATION_RESULT:
-            HandleRegistrationResult(&cmd);
-            break;
-        case CMD_PUSH_MESSAGE_RESULT:
-            HandlePushMessageResult(&cmd, false);
-            break;
-        case CMD_LOCAL_MESSAGE_RESULT:
-            HandlePushMessageResult(&cmd, true);
-            break;
-
-        default:
-            assert(false);
-        }
-
-        if (cmd.m_Data1) {
-            free(cmd.m_Data1);
-        }
-        if (cmd.m_Data2) {
-            free(cmd.m_Data2);
-        }
-    }
-    g_Push.m_CommandsQueue.SetSize(0);
+    dmPush::QueueFlush(&g_Push.m_CommandQueue, dmPush::HandleCommand, 0);
     return dmExtension::RESULT_OK;
 }
 
 static dmExtension::Result AppFinalizePush(dmExtension::AppParams* params)
 {
-    dmMutex::Delete(g_Push.m_Mutex);
     JNIEnv* env = Attach();
     env->CallVoidMethod(g_Push.m_Push, g_Push.m_Stop);
     env->DeleteGlobalRef(g_Push.m_Push);
@@ -770,19 +552,15 @@ static dmExtension::Result AppFinalizePush(dmExtension::AppParams* params)
     Detach();
     g_Push.m_Push = NULL;
     g_Push.m_PushJNI = NULL;
-    g_Push.m_L = 0;
-    g_Push.m_Callback = LUA_NOREF;
-    g_Push.m_Self = LUA_NOREF;
+
+    dmPush::QueueDestroy(&g_Push.m_CommandQueue);
 
     return dmExtension::RESULT_OK;
 }
 
 static dmExtension::Result InitializePush(dmExtension::Params* params)
 {
-
-    g_Push.m_CommandsQueue.SetCapacity(2);
-
-    lua_State*L = params->m_L;
+    lua_State* L = params->m_L;
     int top = lua_gettop(L);
     luaL_register(L, LIB_NAME, Push_methods);
 
@@ -797,8 +575,8 @@ static dmExtension::Result InitializePush(dmExtension::Params* params)
     SETCONSTANT(PRIORITY_HIGH,     1);
     SETCONSTANT(PRIORITY_MAX,      2);
 
-    SETCONSTANT(ORIGIN_REMOTE, DM_PUSH_EXTENSION_ORIGIN_REMOTE);
-    SETCONSTANT(ORIGIN_LOCAL,  DM_PUSH_EXTENSION_ORIGIN_LOCAL);
+    SETCONSTANT(ORIGIN_REMOTE, dmPush::ORIGIN_REMOTE);
+    SETCONSTANT(ORIGIN_LOCAL,  dmPush::ORIGIN_LOCAL);
 
 #undef SETCONSTANT
 
@@ -809,14 +587,8 @@ static dmExtension::Result InitializePush(dmExtension::Params* params)
 
 static dmExtension::Result FinalizePush(dmExtension::Params* params)
 {
-    if (params->m_L == g_Push.m_Listener.m_L && g_Push.m_Listener.m_Callback != LUA_NOREF) {
-        dmScript::Unref(g_Push.m_Listener.m_L, LUA_REGISTRYINDEX, g_Push.m_Listener.m_Callback);
-        dmScript::Unref(g_Push.m_Listener.m_L, LUA_REGISTRYINDEX, g_Push.m_Listener.m_Self);
-        g_Push.m_Listener.m_L = 0;
-        g_Push.m_Listener.m_Callback = LUA_NOREF;
-        g_Push.m_Listener.m_Self = LUA_NOREF;
-    }
-
+    if (g_Push.m_Listener)
+        dmScript::DestroyCallback(g_Push.m_Listener);
     return dmExtension::RESULT_OK;
 }
 
