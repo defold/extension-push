@@ -8,73 +8,24 @@
 
 #define LIB_NAME "push"
 
-struct Push;
-
-/*# Push notifications API documentation
- *
- * Functions and constants for interacting with local, as well as
- * Apple's and Google's push notification services. These API:s only exist on mobile platforms.
- * [icon:ios] [icon:android]
- *
- * @document
- * @name Push notifications
- * @namespace push
- */
-
-struct PushListener
-{
-    PushListener()
-    {
-        Clear();
-    }
-
-    void Clear()
-    {
-        m_L = 0;
-        m_Callback = LUA_NOREF;
-        m_Self = LUA_NOREF;
-    }
-
-    lua_State* m_L;
-    int        m_Callback;
-    int        m_Self;
-};
-
 struct Push
 {
     Push()
     {
-        Clear();
-    }
-
-    void Clear() {
-        m_L = 0;
-        m_Callback = LUA_NOREF;
-        m_Self = LUA_NOREF;
-        m_AppDelegate = 0;
-        m_Listener.Clear();
-        if (m_SavedNotification) {
-            [m_SavedNotification release];
-        }
-        m_SavedNotification = 0;
-        m_SavedNotificationOrigin = DM_PUSH_EXTENSION_ORIGIN_LOCAL;
-        m_SavedWasActivated = false;
+        memset(this, 0, sizeof(*this));
         m_ScheduledID = -1;
     }
 
-    lua_State*           m_L;
-    int                  m_Callback;
-    int                  m_Self;
-    id<UIApplicationDelegate> m_AppDelegate;
-    PushListener         m_Listener;
-    NSDictionary*        m_SavedNotification;
-    int                  m_SavedNotificationOrigin;
-    bool                 m_SavedWasActivated;
-
-    int m_ScheduledID;
+    dmScript::LuaCallbackInfo*  m_Callback;
+    dmScript::LuaCallbackInfo*  m_Listener;
+    id<UIApplicationDelegate>   m_AppDelegate;
+    dmPush::CommandQueue        m_CommandQueue;
+    dmPush::CommandQueue        m_SavedNotifications;
+    int                         m_ScheduledID;
 };
 
-Push g_Push;
+static Push g_Push;
+
 static void PushError(lua_State*L, NSError* error)
 {
     // Could be extended with error codes etc
@@ -101,140 +52,18 @@ static void UpdateScheduleIDCounter()
 
 }
 
-static void RunCallback(lua_State* L, int cb, int self, NSData* deviceToken, NSError* error)
+static const char* ObjCToJson(id obj)
 {
-    int top = lua_gettop(L);
-
-    lua_rawgeti(L, LUA_REGISTRYINDEX, cb);
-
-    // Setup self
-    lua_rawgeti(L, LUA_REGISTRYINDEX, self);
-    lua_pushvalue(L, -1);
-    dmScript::SetInstance(L);
-
-    if (!dmScript::IsInstanceValid(L)) {
-        dmLogError("Could not run push callback because the instance has been deleted.");
-        lua_pop(L, 2);
-        assert(top == lua_gettop(L));
-        return;
-    }
-
-    if (deviceToken) {
-        lua_pushlstring(L, (const char*) [deviceToken bytes], [deviceToken length]);
-    } else {
-        lua_pushnil(L);
-    }
-
-    if (error) {
-        PushError(L, error);
-    } else {
-        lua_pushnil(L);
-    }
-
-    int ret = lua_pcall(L, 3, 0, 0);
-    if (ret != 0) {
-        dmLogError("Error running push callback");
-        lua_pop(L, 1);
-    }
-
-    g_Push.m_L = 0;
-    g_Push.m_Callback = LUA_NOREF;
-    g_Push.m_Self = LUA_NOREF;
-
-    assert(top == lua_gettop(L));
-}
-
-static void ObjCToLua(lua_State*L, id obj)
-{
-    if ([obj isKindOfClass:[NSString class]]) {
-        const char* str = [((NSString*) obj) UTF8String];
-        lua_pushstring(L, str);
-    } else if ([obj isKindOfClass:[NSNumber class]]) {
-        lua_pushnumber(L, [((NSNumber*) obj) doubleValue]);
-    } else if ([obj isKindOfClass:[NSNull class]]) {
-        lua_pushnil(L);
-    } else if ([obj isKindOfClass:[NSDictionary class]]) {
-        NSDictionary* dict = (NSDictionary*) obj;
-        lua_createtable(L, 0, [dict count]);
-        for (NSString* key in dict) {
-            lua_pushstring(L, [key UTF8String]);
-            id value = [dict objectForKey:key];
-            ObjCToLua(L, (NSDictionary*) value);
-            lua_rawset(L, -3);
-        }
-    } else if ([obj isKindOfClass:[NSArray class]]) {
-        NSArray* a = (NSArray*) obj;
-        lua_createtable(L, [a count], 0);
-        for (int i = 0; i < [a count]; ++i) {
-            ObjCToLua(L, [a objectAtIndex: i]);
-            lua_rawseti(L, -2, i+1);
-        }
-    } else {
-        dmLogWarning("Unsupported value '%s' (%s)", [[obj description] UTF8String], [[[obj class] description] UTF8String]);
-        lua_pushnil(L);
-    }
-}
-
-static void RunListener(NSDictionary *userdata, bool local, bool wasActivated)
-{
-    if (g_Push.m_Listener.m_Callback != LUA_NOREF)
+    NSError* error;
+    NSData* jsonData = [NSJSONSerialization dataWithJSONObject:obj options:(NSJSONWritingOptions)0 error:&error];
+    if (!jsonData)
     {
-        lua_State* L = g_Push.m_Listener.m_L;
-        int top = lua_gettop(L);
-
-        lua_rawgeti(L, LUA_REGISTRYINDEX, g_Push.m_Listener.m_Callback);
-
-        // Setup self
-        lua_rawgeti(L, LUA_REGISTRYINDEX, g_Push.m_Listener.m_Self);
-        lua_pushvalue(L, -1);
-        dmScript::SetInstance(L);
-
-        // Local notifications are supplied as JSON
-        if (local) {
-
-            dmJson::Document doc;
-            NSString* json = (NSString*)[userdata objectForKey:@"payload"];
-            dmJson::Result r = dmJson::Parse([json UTF8String], &doc);
-            if (r == dmJson::RESULT_OK && doc.m_NodeCount > 0) {
-                char err_str[128];
-                if (dmScript::JsonToLua(L, &doc, 0, err_str, sizeof(err_str)) < 0) {
-                    dmLogError("Error running push listener: %s", err_str);
-                    dmJson::Free(&doc);
-                    return;
-                }
-            } else {
-                dmLogError("Failed to parse local push response (%d)", r);
-            }
-            dmJson::Free(&doc);
-
-            lua_pushnumber(L, DM_PUSH_EXTENSION_ORIGIN_LOCAL);
-
-        } else {
-            ObjCToLua(L, userdata);
-            lua_pushnumber(L, DM_PUSH_EXTENSION_ORIGIN_REMOTE);
-        }
-
-        lua_pushboolean(L, wasActivated);
-
-        int ret = lua_pcall(L, 4, 0, 0);
-        if (ret != 0) {
-            dmLogError("Error running push callback");
-            lua_pop(L, 1);
-        }
-        assert(top == lua_gettop(L));
-    } else {
-        dmLogWarning("No push listener set, saving message.");
-
-        if (g_Push.m_SavedNotification) {
-            [g_Push.m_SavedNotification release];
-        }
-
-        // Save notification as push.set_listener may not be set at this point, e.g. when launching the app
-        // but clicking on the notification
-        g_Push.m_SavedNotification = [[NSDictionary alloc] initWithDictionary:userdata copyItems:YES];
-        g_Push.m_SavedNotificationOrigin = (local ? DM_PUSH_EXTENSION_ORIGIN_LOCAL : DM_PUSH_EXTENSION_ORIGIN_REMOTE);
-        g_Push.m_SavedWasActivated = wasActivated;
+        return 0;
     }
+    NSString* nsstring = [[NSString alloc] initWithData:jsonData encoding:NSUTF8StringEncoding];
+    const char* json = strdup([nsstring UTF8String]);
+    [nsstring release];
+    return json;
 }
 
 @interface PushAppDelegate : NSObject <UIApplicationDelegate>
@@ -247,14 +76,34 @@ static void RunListener(NSDictionary *userdata, bool local, bool wasActivated)
     bool wasActivated = (application.applicationState == UIApplicationStateInactive
         || application.applicationState == UIApplicationStateBackground);
 
-    RunListener(userInfo, false, wasActivated);
+    dmPush::Command cmd;
+    cmd.m_Callback = g_Push.m_Listener;
+    cmd.m_Command = dmPush::COMMAND_TYPE_PUSH_MESSAGE_RESULT;
+    cmd.m_Result = ObjCToJson(userInfo);
+    cmd.m_WasActivated = wasActivated;
+
+    if (g_Push.m_Listener) {
+        dmPush::QueuePush(&g_Push.m_CommandQueue, &cmd);
+    } else {
+        dmPush::QueuePush(&g_Push.m_SavedNotifications, &cmd); // No callback yet
+    }
 }
 
 - (void)application:(UIApplication *)application didReceiveLocalNotification:(UILocalNotification *)notification {
     bool wasActivated = (application.applicationState == UIApplicationStateInactive
         || application.applicationState == UIApplicationStateBackground);
 
-    RunListener(notification.userInfo, true, wasActivated);
+    dmPush::Command cmd;
+    cmd.m_Callback = g_Push.m_Listener;
+    cmd.m_Command = dmPush::COMMAND_TYPE_LOCAL_MESSAGE_RESULT;
+    cmd.m_Result = ObjCToJson(notification.userInfo);
+    cmd.m_WasActivated = wasActivated;
+
+    if (g_Push.m_Listener) {
+        dmPush::QueuePush(&g_Push.m_CommandQueue, &cmd);
+    } else {
+        dmPush::QueuePush(&g_Push.m_SavedNotifications, &cmd); // No callback yet
+    }
 }
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
@@ -273,102 +122,45 @@ static void RunListener(NSDictionary *userdata, bool local, bool wasActivated)
 }
 
 - (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
-    if (g_Push.m_Callback != LUA_NOREF) {
-        RunCallback(g_Push.m_L, g_Push.m_Callback, g_Push.m_Self, deviceToken, 0);
+    if (g_Push.m_Callback) {
+        NSString* string = [[NSString alloc] initWithData:deviceToken encoding:NSUTF8StringEncoding];
+        const char* result = strdup([string UTF8String]);
+        [string release];
+
+        dmPush::Command cmd;
+        cmd.m_Callback = g_Push.m_Callback;
+        cmd.m_Command = dmPush::COMMAND_TYPE_REGISTRATION_RESULT;
+        cmd.m_Result = result;
+        dmPush::QueuePush(&g_Push.m_CommandQueue, &cmd);
+        g_Push.m_Callback = 0;
     }
 }
 
 - (void)application:(UIApplication *)application didFailToRegisterForRemoteNotificationsWithError:(NSError *)error {
     dmLogWarning("Failed to register remote notifications: %s\n", [error.localizedDescription UTF8String]);
-    if (g_Push.m_Callback != LUA_NOREF) {
-        RunCallback(g_Push.m_L, g_Push.m_Callback, g_Push.m_Self, 0, error);
+    if (g_Push.m_Callback) {
+        dmPush::Command cmd;
+        cmd.m_Callback = g_Push.m_Callback;
+        cmd.m_Command = dmPush::COMMAND_TYPE_REGISTRATION_RESULT;
+        cmd.m_Error = strdup([error.localizedDescription UTF8String]);
+        dmPush::QueuePush(&g_Push.m_CommandQueue, &cmd);
+        g_Push.m_Callback = 0;
     }
 }
 
 @end
 
-/*# Register for push notifications
- * Send a request for push notifications. Note that the notifications table parameter
- * is iOS only and will be ignored on Android.
- *
- * @name push.register
- * @param notifications [type:table] the types of notifications to listen to. [icon:iOS]
- * @param callback [type:function(self, token, error)] register callback function.
- *
- * self
- * :        [type:object] The current object.
- *
- * token
- * :        [type:string] The returned push token if registration is successful.
- *
- * error
- * :        [type:table] A table containing eventual error information.
- *
- * @examples
- *
- * Register for push notifications on iOS. Note that the token needs to be converted on this platform.
- *
- * ```lua
- * local function push_listener(self, payload, origin)
- *      -- The payload arrives here.
- * end
- *
- * function init(self)
- *      local alerts = {push.NOTIFICATION_BADGE, push.NOTIFICATION_SOUND, push.NOTIFICATION_ALERT}
- *      push.register(alerts, function (self, token, error)
- *      if token then
- *           -- NOTE: %02x to pad byte with leading zero
- *           local token_string = ""
- *           for i = 1,#token do
- *               token_string = token_string .. string.format("%02x", string.byte(token, i))
- *           end
- *           print(token_string)
- *           push.set_listener(push_listener)
- *      else
- *           -- Push registration failed.
- *           print(error.error)
- *      end
- * end
- * ```
- *
- * Register for push notifications on Android.
- *
- * ```lua
- * local function push_listener(self, payload, origin)
- *      -- The payload arrives here.
- * end
- *
- * function init(self)
- *      push.register({}, function (self, token, error)
- *          if token then
- *               print(token)
- *               push.set_listener(push_listener)
- *          else
- *               -- Push registration failed.
- *               print(error.error)
- *          end
- *     end)
- * end
- * ```
- */
-int Push_Register(lua_State* L)
+static int Push_Register(lua_State* L)
 {
     int top = lua_gettop(L);
-    if (g_Push.m_Callback != LUA_NOREF) {
-        dmLogError("Unexpected push callback set");
-        dmScript::Unref(L, LUA_REGISTRYINDEX, g_Push.m_Callback);
-        dmScript::Unref(L, LUA_REGISTRYINDEX, g_Push.m_Self);
-        g_Push.m_L = 0;
-        g_Push.m_Callback = LUA_NOREF;
-        g_Push.m_Self = LUA_NOREF;
-    }
 
     if (!lua_istable(L, 1)) {
-    assert(top == lua_gettop(L));
-    luaL_error(L, "First argument must be a table of notification types.");
-    return 0;
+        assert(top == lua_gettop(L));
+        luaL_error(L, "First argument must be a table of notification types.");
+        return 0;
     }
 
+    // Deprecated in iOS 8
     UIRemoteNotificationType types = UIRemoteNotificationTypeNone;
     lua_pushnil(L);
     while (lua_next(L, 1) != 0) {
@@ -376,14 +168,11 @@ int Push_Register(lua_State* L)
         types |= (UIRemoteNotificationType) t;
         lua_pop(L, 1);
     }
-    g_Push.m_L = dmScript::GetMainThread(L);
 
-    luaL_checktype(L, 2, LUA_TFUNCTION);
-    lua_pushvalue(L, 2);
-    g_Push.m_Callback = dmScript::Ref(L, LUA_REGISTRYINDEX);
+    if (g_Push.m_Callback)
+        dmScript::DestroyCallback(g_Push.m_Callback);
 
-    dmScript::GetInstance(L);
-    g_Push.m_Self = dmScript::Ref(L, LUA_REGISTRYINDEX);
+    g_Push.m_Callback = dmScript::CreateCallback(L, 2);
 
     // iOS 8 API
     if ([[UIApplication sharedApplication] respondsToSelector:@selector(registerUserNotificationSettings:)]) {
@@ -410,144 +199,26 @@ int Push_Register(lua_State* L)
     return 0;
 }
 
-/*# set push listener
- *
- * Sets a listener function to listen to push notifications.
- *
- * @name push.set_listener
- * @param listener [type:function(self, payload, origin, activated)] listener callback function.
- * Pass an empty function if you no longer wish to receive callbacks.
- *
- * `self`
- * :    [type:object] The current object
- *
- * `payload`
- * :    [type:table] the push payload
- *
- * `origin`
- * :    [type:constant] push.ORIGIN_LOCAL or push.ORIGIN_REMOTE
- *
- * `activated`
- * :    [type:boolean] true or false depending on if the application was
- *      activated via the notification.
- *
- * @examples
- *
- * Set the push notification listener.
- *
- * ```lua
- * local function push_listener(self, payload, origin, activated)
- *      -- The payload arrives here.
- *      pprint(payload)
- *      if origin == push.ORIGIN_LOCAL then
- *          -- This was a local push
- *          ...
- *      end
- *
- *      if origin == push.ORIGIN_REMOTE then
- *          -- This was a remote push
- *          ...
- *      end
- * end
- *
- * local init(self)
- *      ...
- *      -- Assuming that push.register() has been successfully called earlier
- *      push.set_listener(push_listener)
- * end
- * ```
- */
-int Push_SetListener(lua_State* L)
+static int Push_SetListener(lua_State* L)
 {
-    Push* push = &g_Push;
-    luaL_checktype(L, 1, LUA_TFUNCTION);
-    lua_pushvalue(L, 1);
-    int cb = dmScript::Ref(L, LUA_REGISTRYINDEX);
+    DM_LUA_STACK_CHECK(L, 0);
 
-    if (push->m_Listener.m_Callback != LUA_NOREF) {
-        dmScript::Unref(push->m_Listener.m_L, LUA_REGISTRYINDEX, push->m_Listener.m_Callback);
-        dmScript::Unref(push->m_Listener.m_L, LUA_REGISTRYINDEX, push->m_Listener.m_Self);
-    }
+    if (g_Push.m_Listener)
+        dmScript::DestroyCallback(g_Push.m_Listener);
 
-    push->m_Listener.m_L = dmScript::GetMainThread(L);
-    push->m_Listener.m_Callback = cb;
-
-    dmScript::GetInstance(L);
-    push->m_Listener.m_Self = dmScript::Ref(L, LUA_REGISTRYINDEX);
-
-    if (g_Push.m_SavedNotification) {
-        RunListener(g_Push.m_SavedNotification, g_Push.m_SavedNotificationOrigin == DM_PUSH_EXTENSION_ORIGIN_LOCAL, g_Push.m_SavedWasActivated);
-        [g_Push.m_SavedNotification release];
-        g_Push.m_SavedNotification = 0;
-    }
+    g_Push.m_Listener = dmScript::CreateCallback(L, 1);
     return 0;
 }
 
-/*# set badge icon count [icon:iOS]
- *
- * Set the badge count for application icon.
- * This function is only available on iOS. [icon:iOS]
- *
- * @name push.set_badge_count
- * @param count [type:number] badge count
- */
-int Push_SetBadgeCount(lua_State* L)
+static int Push_SetBadgeCount(lua_State* L)
 {
+    DM_LUA_STACK_CHECK(L, 0);
     int count = luaL_checkinteger(L, 1);
     [UIApplication sharedApplication].applicationIconBadgeNumber = count;
     return 0;
 }
 
-/*# Schedule a local push notification to be triggered at a specific time in the future
- *
- * Local push notifications are scheduled with this function.
- * The returned `id` value is uniquely identifying the scheduled notification
- * and can be stored for later reference.
- *
- * @name push.schedule
- * @param time [type:number] number of seconds into the future until the notification should be triggered
- * @param title [type:string] localized title to be displayed to the user if the application is not running
- * @param alert [type:string] localized body message of the notification to be displayed to the user if the application is not running
- * @param payload [type:string] JSON string to be passed to the registered listener function
- * @param notification_settings [type:table] table with notification and platform specific fields
- *
- * action [icon:iOS]
- * :    [type:string]
- *      The alert action string to be used as the title of the right button of the
- *      alert or the value of the unlock slider, where the value replaces
- *      "unlock" in "slide to unlock" text.
- *
- * badge_count [icon:iOS]
- * :    [type:number] The numeric value of the icon badge.
- *
- * <s>badge_number</s>
- * :    Deprecated! Use badge_count instead
- *
- * priority [icon:android]
- * :    [type:number]
- *      The priority is a hint to the device UI about how the notification
- *      should be displayed. There are five priority levels, from -2 to 2 where -1 is the
- *      lowest priority and 2 the highest. Unless specified, a default priority level of 2
- *      is used.
- *
- * @return id [type:number] unique id that can be used to cancel or inspect the notification
- * @return err [type:string] error string if something went wrong, otherwise nil
- * @examples
- *
- * This example demonstrates how to schedule a local notification:
- *
- * ```lua
- * -- Schedule a local push in 3 seconds
- * local payload = '{ "data" : { "field" : "Some value", "field2" : "Other value" } }'
- * id, err = push.schedule(3, "Update!", "There are new stuff in the app", payload, { action = "check it out" })
- * if err then
- *      -- Something went wrong
- *      ...
- * end
- * ```
- *
- */
-int Push_Schedule(lua_State* L)
+static int Push_Schedule(lua_State* L)
 {
     int top = lua_gettop(L);
 
@@ -639,7 +310,7 @@ int Push_Schedule(lua_State* L)
         // sound
         /*
 
-        There is now way of automatically bundle files inside the .app folder (i.e. skipping
+        There is no way of automatically bundle files inside the .app folder (i.e. skipping
         archiving them inside the .darc), but to have custom notification sounds they need to
         be accessable from the .app folder.
 
@@ -662,16 +333,10 @@ int Push_Schedule(lua_State* L)
     return 1;
 }
 
-/*# Cancel a scheduled local push notification
- *
- * Use this function to cancel a previously scheduled local push notification. The
- * notification is identified by a numeric id as returned by `push.schedule()`.
- *
- * @name push.cancel
- * @param id [type:number] the numeric id of the local push notification
- */
-int Push_Cancel(lua_State* L)
+static int Push_Cancel(lua_State* L)
 {
+    DM_LUA_STACK_CHECK(L, 0);
+
     int cancel_id = luaL_checkinteger(L, 1);
     for (id obj in [[UIApplication sharedApplication] scheduledLocalNotifications]) {
         UILocalNotification* notification = (UILocalNotification*)obj;
@@ -725,16 +390,7 @@ static void NotificationToLua(lua_State* L, UILocalNotification* notification)
     lua_settable(L, -3);
 }
 
-/*# Retrieve data on a scheduled local push notification
- *
- * Returns a table with all data associated with a specified local push notification.
- * The notification is identified by a numeric id as returned by `push.schedule()`.
- *
- * @name push.get_scheduled
- * @param id [type:number] the numeric id of the local push notification
- * @return data [type:table] table with all data associated with the notification
- */
-int Push_GetScheduled(lua_State* L)
+static int Push_GetScheduled(lua_State* L)
 {
     int get_id = luaL_checkinteger(L, 1);
     for (id obj in [[UIApplication sharedApplication] scheduledLocalNotifications]) {
@@ -749,18 +405,10 @@ int Push_GetScheduled(lua_State* L)
     return 0;
 }
 
-/*# Retrieve data on all scheduled local push notifications
- *
- * Returns a table with all data associated with all scheduled local push notifications.
- * The table contains key, value pairs where the key is the push notification id and the
- * value is a table with the notification data, corresponding to the data given by
- * `push.get_scheduled(id)`.
- *
- * @name push.get_all_scheduled
- * @return data [type:table] table with all data associated with all scheduled notifications
- */
-int Push_GetAllScheduled(lua_State* L)
+static int Push_GetAllScheduled(lua_State* L)
 {
+    DM_LUA_STACK_CHECK(L, 1);
+
     lua_createtable(L, 0, 0);
     for (id obj in [[UIApplication sharedApplication] scheduledLocalNotifications]) {
 
@@ -790,101 +438,54 @@ static const luaL_reg Push_methods[] =
     {0, 0}
 };
 
-/*# badge notification type
- *
- * @name push.NOTIFICATION_BADGE
- * @variable
- */
-
-/*# sound notification type
- *
- * @name push.NOTIFICATION_SOUND
- * @variable
- */
-
-/*# alert notification type
- *
- * @name push.NOTIFICATION_ALERT
- * @variable
- */
-
-/*# local push origin
- *
- * @name push.ORIGIN_LOCAL
- * @variable
- */
-
-/*# remote push origin
- *
- * @name push.ORIGIN_REMOTE
- * @variable
- */
-
-/*# lowest notification priority [icon:android]
- *
- * This priority is for items might not be shown to the user except under special circumstances, such as detailed notification logs. Only available on Android. [icon:android]
- *
- * @name push.PRIORITY_MIN
- *
- * @variable
- */
-
-
-/*# lower notification priority [icon:android]
- *
- * Priority for items that are less important. Only available on Android. [icon:android]
- *
- * @name push.PRIORITY_LOW
- *
- * @variable
- */
-
-/*# default notification priority [icon:android]
- *
- * The default notification priority. Only available on Android. [icon:android]
- *
- * @name push.PRIORITY_DEFAULT
- *
- * @variable
- */
-
-/*# higher notification priority [icon:android]
- *
- * Priority for more important notifications or alerts. Only available on Android. [icon:android]
- *
- * @name push.PRIORITY_HIGH
- *
- * @variable
- */
-
-/*# highest notification priority [icon:android]
- *
- * Set this priority for your application's most important items that require the user's prompt attention or input. Only available on Android. [icon:android]
- *
- * @name push.PRIORITY_MAX
- *
- * @variable
- */
-
-
-dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
+struct PushAppDelegateRegister
 {
-    g_Push.Clear();
-    g_Push.m_AppDelegate = [[PushAppDelegate alloc] init];
-    dmExtension::RegisteriOSUIApplicationDelegate(g_Push.m_AppDelegate);
+    id<UIApplicationDelegate> m_Delegate;
+    PushAppDelegateRegister() {
+        m_Delegate = [[PushAppDelegate alloc] init];
+        dmExtension::RegisteriOSUIApplicationDelegate(m_Delegate);
+    }
+
+    ~PushAppDelegateRegister() {
+        dmExtension::UnregisteriOSUIApplicationDelegate(m_Delegate);
+        [m_Delegate release];
+    }
+};
+
+static PushAppDelegateRegister g_PushDelegateRegister;
+
+static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
+{
+    dmPush::QueueCreate(&g_Push.m_CommandQueue);
+    dmPush::QueueCreate(&g_Push.m_SavedNotifications);
     return dmExtension::RESULT_OK;
 }
 
-dmExtension::Result AppFinalizePush(dmExtension::AppParams* params)
+static dmExtension::Result UpdatePush(dmExtension::Params* params)
 {
-    dmExtension::UnregisteriOSUIApplicationDelegate(g_Push.m_AppDelegate);
-    [g_Push.m_AppDelegate release];
-    g_Push.m_AppDelegate = 0;
-    g_Push.Clear();
+    // Set the new callback to the saved notifications, and put them on the queue
+    if (!g_Push.m_SavedNotifications.m_Commands.Empty()) {
+        DM_MUTEX_SCOPED_LOCK(g_Push.m_SavedNotifications.m_Mutex);
+        for (int i = 0; i < g_Push.m_SavedNotifications.m_Commands.Size(); ++i)
+        {
+            dmPush::Command& cmd = g_Push.m_SavedNotifications.m_Commands[i];
+            cmd.m_Callback = g_Push.m_Listener;
+        }
+    }
+
+    dmPush::QueueFlush(&g_Push.m_SavedNotifications, dmPush::HandleCommand, 0);
+    dmPush::QueueFlush(&g_Push.m_CommandQueue, dmPush::HandleCommand, 0);
     return dmExtension::RESULT_OK;
 }
 
-dmExtension::Result InitializePush(dmExtension::Params* params)
+static dmExtension::Result AppFinalizePush(dmExtension::AppParams* params)
+{
+    dmPush::QueueDestroy(&g_Push.m_CommandQueue);
+    dmPush::QueueDestroy(&g_Push.m_SavedNotifications);
+    return dmExtension::RESULT_OK;
+}
+
+static dmExtension::Result InitializePush(dmExtension::Params* params)
 {
     lua_State*L = params->m_L;
     int top = lua_gettop(L);
@@ -898,8 +499,8 @@ dmExtension::Result InitializePush(dmExtension::Params* params)
     SETCONSTANT(NOTIFICATION_SOUND, UIRemoteNotificationTypeSound);
     SETCONSTANT(NOTIFICATION_ALERT, UIRemoteNotificationTypeAlert);
 
-    SETCONSTANT(ORIGIN_REMOTE, DM_PUSH_EXTENSION_ORIGIN_REMOTE);
-    SETCONSTANT(ORIGIN_LOCAL,  DM_PUSH_EXTENSION_ORIGIN_LOCAL);
+    SETCONSTANT(ORIGIN_REMOTE, dmPush::ORIGIN_REMOTE);
+    SETCONSTANT(ORIGIN_LOCAL,  dmPush::ORIGIN_LOCAL);
 
 #undef SETCONSTANT
 
@@ -909,18 +510,14 @@ dmExtension::Result InitializePush(dmExtension::Params* params)
     return dmExtension::RESULT_OK;
 }
 
-dmExtension::Result FinalizePush(dmExtension::Params* params)
+static dmExtension::Result FinalizePush(dmExtension::Params* params)
 {
-    if (params->m_L == g_Push.m_Listener.m_L && g_Push.m_Listener.m_Callback != LUA_NOREF) {
-        dmScript::Unref(g_Push.m_Listener.m_L, LUA_REGISTRYINDEX, g_Push.m_Listener.m_Callback);
-        dmScript::Unref(g_Push.m_Listener.m_L, LUA_REGISTRYINDEX, g_Push.m_Listener.m_Self);
-        g_Push.m_Listener.m_L = 0;
-        g_Push.m_Listener.m_Callback = LUA_NOREF;
-        g_Push.m_Listener.m_Self = LUA_NOREF;
-    }
-
+    if (g_Push.m_Listener)
+        dmScript::DestroyCallback(g_Push.m_Listener);
+    g_Push.m_Listener = 0;
+    g_Push.m_Callback = 0;
     return dmExtension::RESULT_OK;
 }
 
-DM_DECLARE_EXTENSION(PushExtExternal, "Push", AppInitializePush, AppFinalizePush, InitializePush, 0, 0, FinalizePush)
+DM_DECLARE_EXTENSION(PushExtExternal, "Push", AppInitializePush, AppFinalizePush, InitializePush, UpdatePush, 0, FinalizePush)
 #endif // DM_PLATFORM_IOS
