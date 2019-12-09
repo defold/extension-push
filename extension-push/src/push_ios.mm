@@ -143,9 +143,12 @@ static const char* ObjCToJson(id obj)
     if (g_Push.m_Callback) {
         const char* result = 0;
         if (deviceToken) {
-            NSString* string = [[NSString alloc] initWithData:deviceToken encoding:NSUTF8StringEncoding];
-            result = string ? strdup([string UTF8String]) : 0;
-            [string release];
+            const uint32_t* tokenBytes = (const uint32_t*)[deviceToken bytes];
+            NSString* hexToken = [NSString stringWithFormat:@"%08x%08x%08x%08x%08x%08x%08x%08x",
+                                 ntohl(tokenBytes[0]), ntohl(tokenBytes[1]), ntohl(tokenBytes[2]),
+                                 ntohl(tokenBytes[3]), ntohl(tokenBytes[4]), ntohl(tokenBytes[5]),
+                                 ntohl(tokenBytes[6]), ntohl(tokenBytes[7])];
+            result = hexToken ? strdup([hexToken UTF8String]) : 0;
         }
 
         dmPush::Command cmd;
