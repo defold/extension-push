@@ -16,9 +16,23 @@ struct Push
         m_ScheduledID = -1;
     }
 
+    bool IsInitialized() { return m_Initialized; }
+
+    void Initialize() {
+        dmPush::QueueCreate(&m_CommandQueue);
+        dmPush::QueueCreate(&m_SavedNotifications);
+        m_Initialized = true;
+    }
+
+    void Finalize() {
+        dmPush::QueueCreate(&m_CommandQueue);
+        dmPush::QueueCreate(&m_SavedNotifications);
+        m_Initialized = false;
+    }
+
+    bool                        m_Initialized;
     dmScript::LuaCallbackInfo*  m_Callback;
     dmScript::LuaCallbackInfo*  m_Listener;
-    id<UIApplicationDelegate>   m_AppDelegate;
     dmPush::CommandQueue        m_CommandQueue;
     dmPush::CommandQueue        m_SavedNotifications;
     int                         m_ScheduledID;
@@ -108,6 +122,10 @@ static const char* ObjCToJson(id obj)
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    if (!g_Push.IsInitialized()) {
+        g_Push.Initialize();
+    }
+
     UILocalNotification *localNotification = [launchOptions objectForKey:UIApplicationLaunchOptionsLocalNotificationKey];
     if (localNotification) {
         [self application:application didReceiveLocalNotification:localNotification];
@@ -456,8 +474,9 @@ static PushAppDelegateRegister g_PushDelegateRegister;
 
 static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
 {
-    dmPush::QueueCreate(&g_Push.m_CommandQueue);
-    dmPush::QueueCreate(&g_Push.m_SavedNotifications);
+    if (!g_Push.IsInitialized()) {
+        g_Push.Initialize();
+    }
     return dmExtension::RESULT_OK;
 }
 
@@ -480,8 +499,9 @@ static dmExtension::Result UpdatePush(dmExtension::Params* params)
 
 static dmExtension::Result AppFinalizePush(dmExtension::AppParams* params)
 {
-    dmPush::QueueDestroy(&g_Push.m_CommandQueue);
-    dmPush::QueueDestroy(&g_Push.m_SavedNotifications);
+    if (g_Push.IsInitialized()) {
+        g_Push.Finalize();
+    }
     return dmExtension::RESULT_OK;
 }
 
