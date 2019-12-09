@@ -56,7 +56,7 @@ static void HandleRegistrationResult(const dmPush::Command* cmd)
     } else {
         lua_pushnil(L);
         PushError(L, cmd->m_Error);
-        dmLogError("GCM error %s", cmd->m_Error);
+        dmLogError("HandleRegistrationResult: %s", cmd->m_Error);
     }
 
     int ret = dmScript::PCall(L, 3, 0);
