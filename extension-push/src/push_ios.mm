@@ -141,9 +141,15 @@ static const char* ObjCToJson(id obj)
 
 - (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
     if (g_Push.m_Callback) {
-        NSString* string = [[NSString alloc] initWithData:deviceToken encoding:NSUTF8StringEncoding];
-        const char* result = strdup([string UTF8String]);
-        [string release];
+        const char* result = 0;
+        if (deviceToken) {
+            const uint32_t* tokenBytes = (const uint32_t*)[deviceToken bytes];
+            NSString* hexToken = [NSString stringWithFormat:@"%08x%08x%08x%08x%08x%08x%08x%08x",
+                                 ntohl(tokenBytes[0]), ntohl(tokenBytes[1]), ntohl(tokenBytes[2]),
+                                 ntohl(tokenBytes[3]), ntohl(tokenBytes[4]), ntohl(tokenBytes[5]),
+                                 ntohl(tokenBytes[6]), ntohl(tokenBytes[7])];
+            result = hexToken ? strdup([hexToken UTF8String]) : 0;
+        }
 
         dmPush::Command cmd;
         cmd.m_Callback = g_Push.m_Callback;
@@ -160,7 +166,7 @@ static const char* ObjCToJson(id obj)
         dmPush::Command cmd;
         cmd.m_Callback = g_Push.m_Callback;
         cmd.m_Command = dmPush::COMMAND_TYPE_REGISTRATION_RESULT;
-        cmd.m_Error = strdup([error.localizedDescription UTF8String]);
+        cmd.m_Error = error ? strdup([error.localizedDescription UTF8String]) : 0;
         dmPush::QueuePush(&g_Push.m_CommandQueue, &cmd);
         g_Push.m_Callback = 0;
     }
