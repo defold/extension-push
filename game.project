@@ -16,7 +16,6 @@ fcm_application_id = 1:536227802192:android:eb2b4cc5816cbb60
 
 [project]
 title = extension-push
-dependencies = https://github.com/defold/android-base-extensions/releases/download/1.0.0/firebase-core-16.0.8.zip,https://github.com/defold/android-base-extensions/releases/download/1.0.0/gps-base-16.0.1.zip,https://github.com/defold/android-base-extensions/releases/download/1.0.0/support-v4-26.1.0.zip,https://github.com/defold/android-base-extensions/releases/download/1.0.0/firebase-messaging-17.3.4.zip,https://github.com/defold/android-base-extensions/releases/download/1.0.0/gps-measurement-16.4.0.zip
 
 [library]
 include_dirs = extension-push

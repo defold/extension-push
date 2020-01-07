@@ -1,1 +1,6 @@
 name: PushExtExternal
+
+platforms:
+    android:
+      context:
+        aaptExtraPackages: ['com.android.support', 'com.google.android.gms', 'com.google.android.gms.common']
