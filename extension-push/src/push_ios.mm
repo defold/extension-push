@@ -489,16 +489,17 @@ static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
 static dmExtension::Result UpdatePush(dmExtension::Params* params)
 {
     // Set the new callback to the saved notifications, and put them on the queue
-    if (!g_Push.m_SavedNotifications.m_Commands.Empty()) {
+    if (!g_Push.m_SavedNotifications.m_Commands.Empty() & g_Push.m_Listener != 0) {
         DM_MUTEX_SCOPED_LOCK(g_Push.m_SavedNotifications.m_Mutex);
         for (int i = 0; i < g_Push.m_SavedNotifications.m_Commands.Size(); ++i)
         {
             dmPush::Command& cmd = g_Push.m_SavedNotifications.m_Commands[i];
             cmd.m_Callback = g_Push.m_Listener;
         }
+
+        dmPush::QueueFlush(&g_Push.m_SavedNotifications, dmPush::HandleCommand, 0);
     }
 
-    dmPush::QueueFlush(&g_Push.m_SavedNotifications, dmPush::HandleCommand, 0);
     dmPush::QueueFlush(&g_Push.m_CommandQueue, dmPush::HandleCommand, 0);
     return dmExtension::RESULT_OK;
 }
