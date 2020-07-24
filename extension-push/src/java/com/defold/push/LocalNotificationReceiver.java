@@ -21,6 +21,10 @@ public class LocalNotificationReceiver extends WakefulBroadcastReceiver {
 
     NotificationManager nm;
 
+    public LocalNotificationReceiver() {
+        super();
+    }
+
     @Override
     public void onReceive(Context context, Intent intent) {
 
