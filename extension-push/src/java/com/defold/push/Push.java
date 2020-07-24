@@ -359,9 +359,13 @@ public class Push {
 
                         // Get new Instance ID token
                         String token = task.getResult().getToken();
-                        sendRegistrationResult(token, null);
+                        sendToken(token);
                     }
                 });
+    }
+
+    public void sendToken(String token) {
+        sendRegistrationResult(token, null);
     }
 
     private boolean checkPlayServices(Activity activity) {
