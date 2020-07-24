@@ -5,8 +5,8 @@ main_collection = /main/push.collectionc
 shared_state = 1
 
 [display]
-width = 960
-height = 640
+width = 640
+height = 1136
 
 [android]
 input_method = HiddenInputField
@@ -16,9 +16,11 @@ fcm_application_id = 1:99873825196:android:eb2b4cc5816cbb60
 
 [project]
 title = extension-push
+dependencies = https://github.com/andsve/dirtylarry/archive/master.zip
 
 [library]
 include_dirs = extension-push
 
 [ios]
 bundle_identifier = com.defold.push
+

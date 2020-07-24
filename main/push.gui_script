@@ -1,0 +1,197 @@
+local dirtylarry = require "dirtylarry.dirtylarry"
+
+local function stringify(value, indentation)
+	indentation = indentation or "  "
+	local i = ""
+	local s = ""
+	local fmt_fn = nil
+	fmt_fn = function(v)
+		local t = type(v)
+		if t ~= "table" then
+			s = s .. (i .. v .. "\n")
+		else
+			for name,data in pairs(v) do
+				if type(data) == "table" then
+					s = s .. (i .. name .. " = {\n")
+					i = i .. indentation
+					fmt_fn(data)
+					i = i:sub(1,#i-#indentation)
+					s = s .. (i .. "}\n")
+				else
+					s = s .. (i .. name .. " = " .. tostring(data) .. ",\n")
+				end
+			end
+		end
+	end
+	fmt_fn(value)
+	return s
+end
+
+local function set_text(text, ...)
+	gui.set_text(gui.get_node("message"), text:format(...))
+end
+
+local function set_payload(text, ...)
+	gui.set_text(gui.get_node("payload"), text:format(...))
+end
+
+local function listener(self, payload, origin, activated)
+	-- The payload arrives here.
+	set_text(string.format("Push payload received: (activated: %s)", tostring(activated)))
+	set_payload(stringify(payload))
+	pprint(payload)
+end
+
+local function push_ios(self)
+	local alerts = { push.NOTIFICATION_BADGE, push.NOTIFICATION_SOUND, push.NOTIFICATION_ALERT }
+	push.register(alerts, function(self, token, error)
+		if token then
+			local s = ""
+			for i = 1,#token do
+				s = s .. string.format("%02x", string.byte(token, i))
+			end
+			print(s)
+		else
+			set_text("Push error: %s", error.error)
+		end
+	end)
+	push.set_listener(listener)
+	set_text("Waiting for push message")
+end
+
+local function push_android(self)
+	push.register(nil, function(self, token, error)
+		if token then
+			set_text("Device token: %s", token)
+		else
+			set_text("Push error: %s", error.error)
+		end
+	end)
+	push.set_listener(listener)
+	set_text("Waiting for push message")
+end
+
+local function push_local(self, delay)
+	local payload = '{"data":{"field":"Some value","field2":"Other value"}}'
+	local id, err = push.schedule(delay, "A notification!", "Hello there", payload, { action = "get going" })
+	if err then
+		set_text(err)
+	else
+		set_text("Local push scheduled in %d seconds", delay)
+	end
+	return id
+end
+
+local function push_get_one(self, id)
+	if not id then
+		set_text("No local push notification sent!")
+		set_payload(stringify({}))
+		return
+	end
+
+	local t, err = push.get_scheduled(id)
+	if not t then
+		set_text("No local push notification sent!")
+		set_payload(stringify({}))
+		return
+	end
+
+	set_text("push.get_scheduled(%d)", id and id or "nil")
+	set_payload(stringify(t))
+end
+
+
+local function push_get_all(self)
+	local t, err = push.get_all_scheduled()
+
+	set_text("push.get_all_scheduled()")
+	set_payload(stringify(t))
+end
+
+local function cancel_one(self, id)
+	if not id then
+		set_text("No local push notification sent!")
+		set_payload(stringify({}))
+		return
+	end
+
+	push.cancel(id)
+
+	set_text("push.cancel(%s)", id)
+	set_payload("Cancelled: %s", id)
+	print("PUSH:",  s)
+end
+
+local function cancel_all(self)
+	local s = "cancelled:"
+	local notifications, err = push.get_all_scheduled()
+	for id, v in pairs(notifications) do
+
+		s = s .. "\n" .. tostring(id)
+		push.cancel(id)
+	end
+
+	set_text("push.cancel_all()")
+	set_payload(s)
+	print("PUSH:\n", s)
+end
+
+
+function init(self)
+	local sysinfo = sys.get_sys_info()
+	if sysinfo.system_name == "Android" then
+		push_android(self)
+	elseif sysinfo.system_name == "iPhone OS" then
+		push_ios(self)
+	else
+		set_text("Notifications work only on iOS or Android")
+	end
+
+	self.id = nil
+
+	if not push then
+		return
+	end
+
+	msg.post(".", "acquire_input_focus")
+	
+	local t, err = push.get_all_scheduled()
+	set_text("push.get_all_scheduled()")
+	if t then
+		set_payload(stringify(t))
+	else
+		set_payload("No events scheduled")
+	end
+end
+
+
+function on_message(self, message_id, message, sender)
+	if message_id == hash("set_message") then
+		local node = gui.get_node("message")
+		gui.set_text(node, message.text)
+	elseif message_id == hash("set_payload") then
+	end
+end
+
+function on_input(self, action_id, action)
+	if action_id then
+		dirtylarry:button("local10", action_id, action, function()
+			self.id = push_local(self, 10)
+		end)
+		dirtylarry:button("local30", action_id, action, function()
+			self.id = push_local(self, 30)
+		end)
+		dirtylarry:button("get", action_id, action, function()
+			push_get_one(self, self.id)
+		end)
+		dirtylarry:button("getall", action_id, action, function()
+			push_get_all(self)
+		end)
+		dirtylarry:button("cancel", action_id, action, function()
+			cancel_one(self, self.id)
+		end)
+		dirtylarry:button("cancelall", action_id, action, function()
+			cancel_all(self)
+		end)
+	end
+end
