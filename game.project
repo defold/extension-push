@@ -1,3 +1,8 @@
+[project]
+title = extension-push
+dependencies = https://github.com/andsve/dirtylarry/archive/master.zip
+bundle_resources = /bundle
+
 [bootstrap]
 main_collection = /main/push.collectionc
 
@@ -11,16 +16,9 @@ height = 1136
 [android]
 input_method = HiddenInputField
 package = com.defold.push
-gcm_sender_id = 99873825196
-fcm_application_id = 1:99873825196:android:eb2b4cc5816cbb60
-
-[project]
-title = extension-push
-dependencies = https://github.com/andsve/dirtylarry/archive/master.zip
 
 [library]
 include_dirs = extension-push
 
 [ios]
 bundle_identifier = com.defold.push
-

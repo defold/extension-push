@@ -342,10 +342,6 @@ public class Push {
             Log.w(Push.TAG, "Gcm Sender Id must be set.");
             return;
         }
-        FirebaseOptions.Builder builder = new FirebaseOptions.Builder()
-            .setApplicationId(this.applicationIdFCM)
-            .setGcmSenderId(this.senderIdFCM);
-        FirebaseApp.initializeApp(activity, builder.build());
 
         FirebaseInstanceId.getInstance().getInstanceId()
                 .addOnCompleteListener(new OnCompleteListener<InstanceIdResult>() {

@@ -1,0 +1,91 @@
+{
+  "project_info": {
+    "project_number": "99873825196",
+    "firebase_url": "https://defold-a4b3f.firebaseio.com",
+    "project_id": "defold-a4b3f",
+    "storage_bucket": "defold-a4b3f.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:99873825196:android:eb2b4cc5816cbb60",
+        "android_client_info": {
+          "package_name": "com.defold.firebase"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "99873825196-c7bgtu6qlnk5sfgh1vdjkcthejh8nhsl.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.defold.firebase",
+            "certificate_hash": "9e93b3336c767c3aba6fcc4deada9f179ee4a05b"
+          }
+        },
+        {
+          "client_id": "99873825196-pgcojk4nb5ljnjie9hjni9af1hjmbpql.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjhON2B_-2mCvZXiY0hucJcFJySUSM_vU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "99873825196-pgcojk4nb5ljnjie9hjni9af1hjmbpql.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "99873825196-8v9ebnqgv7qu2mnjo0dutofiudir2l55.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.foo.boo"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:99873825196:android:1d6d45fbaa4d7bdfe69a09",
+        "android_client_info": {
+          "package_name": "com.defold.push"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "99873825196-pgcojk4nb5ljnjie9hjni9af1hjmbpql.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjhON2B_-2mCvZXiY0hucJcFJySUSM_vU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "99873825196-pgcojk4nb5ljnjie9hjni9af1hjmbpql.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "99873825196-8v9ebnqgv7qu2mnjo0dutofiudir2l55.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.foo.boo"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
