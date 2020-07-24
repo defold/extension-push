@@ -10,9 +10,9 @@ height = 640
 
 [android]
 input_method = HiddenInputField
-package = com.defold.pushtest
-gcm_sender_id = 536227802192
-fcm_application_id = 1:536227802192:android:eb2b4cc5816cbb60
+package = com.defold.push
+gcm_sender_id = 99873825196
+fcm_application_id = 1:99873825196:android:eb2b4cc5816cbb60
 
 [project]
 title = extension-push
@@ -21,5 +21,4 @@ title = extension-push
 include_dirs = extension-push
 
 [ios]
-bundle_identifier = com.defoldextension.push
-
+bundle_identifier = com.defold.push
