@@ -1,3 +1,10 @@
+---
+layout: manual
+language: en
+title: Defold Push notification documentation
+brief: This manual covers how to setup and use push notifications in Defold.
+---
+
 # Defold Push notification documentation
 
 Push notifications are available on iOS and Android (Google using Firebase Cloud Messaging) devices as a [native extension](/manuals/extensions/) and allow your game to inform the player about changes and updates. The core functionality is similar between iOS and Android but there are some platform specific differences that you need to consider.
