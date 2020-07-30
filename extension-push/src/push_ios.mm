@@ -416,6 +416,8 @@ static void NotificationToLua(lua_State* L, UILocalNotification* notification)
 
 static int Push_GetScheduled(lua_State* L)
 {
+    DM_LUA_STACK_CHECK(L, 1);
+
     int get_id = luaL_checkinteger(L, 1);
     for (id obj in [[UIApplication sharedApplication] scheduledLocalNotifications]) {
         UILocalNotification* notification = (UILocalNotification*)obj;
@@ -426,7 +428,8 @@ static int Push_GetScheduled(lua_State* L)
             return 1;
         }
     }
-    return 0;
+    lua_pushnil(L);
+    return 1;
 }
 
 static int Push_GetAllScheduled(lua_State* L)

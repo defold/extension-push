@@ -342,10 +342,6 @@ public class Push {
             Log.w(Push.TAG, "Gcm Sender Id must be set.");
             return;
         }
-        FirebaseOptions.Builder builder = new FirebaseOptions.Builder()
-            .setApplicationId(this.applicationIdFCM)
-            .setGcmSenderId(this.senderIdFCM);
-        FirebaseApp.initializeApp(activity, builder.build());
 
         FirebaseInstanceId.getInstance().getInstanceId()
                 .addOnCompleteListener(new OnCompleteListener<InstanceIdResult>() {
@@ -359,9 +355,13 @@ public class Push {
 
                         // Get new Instance ID token
                         String token = task.getResult().getToken();
-                        sendRegistrationResult(token, null);
+                        sendToken(token);
                     }
                 });
+    }
+
+    public void sendToken(String token) {
+        sendRegistrationResult(token, null);
     }
 
     private boolean checkPlayServices(Activity activity) {

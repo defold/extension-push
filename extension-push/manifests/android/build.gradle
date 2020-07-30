@@ -1,6 +1,5 @@
 dependencies {
   // https://firebase.google.com/docs/android/setup#available-libraries
-  compile 'com.google.firebase:firebase-messaging:17.3.4'
+  compile 'com.google.firebase:firebase-messaging:18.0.0'
 
-  compile 'com.google.android.gms:play-services-base:16.0.1'
 }
