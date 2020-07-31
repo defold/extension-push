@@ -190,7 +190,7 @@ DEBUG:SCRIPT: APA91bHkcKm0QHAMUCEQ_Dlpq2gzset6vh0cz46kDDV6230C5rFivyWZMCxGXcjxRD
 
 Before we can send any messages we need to get a key that will be used for authentication against the Firebase servers. You will find the key under *Settings* and *Cloud Messaging* on the Firebase dashboard.
 
-![Server Key location](images/push/push_fcm_server_key.png)
+![Server Key location](push_fcm_server_key.png)
 
 Now we have all information we need. Firebase's notifications can be sent through a Web API so we can use *curl* to send test messages:
 
