@@ -1,6 +1,4 @@
 ---
-layout: manual
-language: en
 title: Defold Push notification documentation
 brief: This manual covers how to setup and use push notifications in Defold.
 ---
