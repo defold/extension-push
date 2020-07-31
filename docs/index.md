@@ -19,7 +19,6 @@ Or point to the ZIP file of a [specific release](https://github.com/defold/exten
 
 
 ## iOS setup
-
 ::: sidenote
 To get acquainted with the Apple Push Notification Service, a good idea is to start by reading [Apple's own documentation on how the service works](https://developer.apple.com/library/ios/documentation/NetworkingInternet/Conceptual/RemoteNotificationsPG/Chapters/ApplePushService.html).
 :::
@@ -129,7 +128,6 @@ If you wish to update the badge count from within the application, use the `push
 
 
 ## Android setup
-
 Push notification on Android uses Firebase Cloud Messaging. You need to configure an application in the Firebase Console. The steps below taken from the [official Google Firebase Guides](https://firebase.google.com/docs/android/setup#create-firebase-project).
 
 ::: sidenote
@@ -150,6 +148,8 @@ Firebase has extensive documentation for Firebase Cloud Messaging. We encourage 
 * Enter your app's package name in the Android package name field.
 
 * Click Register app
+
+![Google Cloud Messaging sender ID](push_fcm_register.png)
 
 
 ### Add a Firebase configuration file
