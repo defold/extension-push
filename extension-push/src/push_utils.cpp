@@ -42,6 +42,11 @@ static void PushError(lua_State* L, const char* error)
 
 static void HandleRegistrationResult(const dmPush::Command* cmd)
 {
+    if (!dmScript::IsCallbackValid(cmd->m_Callback))
+    {
+        return;
+    }
+    
     lua_State* L = dmScript::GetCallbackLuaContext(cmd->m_Callback);
     DM_LUA_STACK_CHECK(L, 0);
 
@@ -63,11 +68,17 @@ static void HandleRegistrationResult(const dmPush::Command* cmd)
     (void)ret;
 
     dmScript::TeardownCallback(cmd->m_Callback);
+    dmScript::DestroyCallback(cmd->m_Callback);
 }
 
 
 static void HandlePushMessageResult(const dmPush::Command* cmd, bool local)
 {
+    if (!dmScript::IsCallbackValid(cmd->m_Callback))
+    {
+        return;
+    }
+
     lua_State* L = dmScript::GetCallbackLuaContext(cmd->m_Callback);
     DM_LUA_STACK_CHECK(L, 0);
 
@@ -111,9 +122,6 @@ void dmPush::HandleCommand(dmPush::Command* cmd, void* ctx)
     }
     free((void*)cmd->m_Result);
     free((void*)cmd->m_Error);
-
-    if (cmd->m_Command == dmPush::COMMAND_TYPE_REGISTRATION_RESULT)
-        dmScript::DestroyCallback(cmd->m_Callback);
 }
 
 void dmPush::QueueCreate(CommandQueue* queue)
