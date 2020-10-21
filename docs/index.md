@@ -10,7 +10,7 @@ Push notifications are available on iOS and Android (Google using Firebase Cloud
 For a push notification to find its way from the server to the target device, certain bits of information are required for your app. The most complex part consists of security information that you set in the application so the notification system can verify the legitimacy of the client receiving notifications. But you will also need a piece of security information for your notification server so the Apple or Google servers can verify that your server is a legitimate notification sender. Finally, when you send notifications, you need to be able to uniquely direct notifications to a specific user's device. For that you retrieve and use a token that is unique to the particular device (i.e. user).
 
 
-## Installing the extension
+## Installation
 You can use the extension in your own project by adding this project as a [Defold library dependency](/manuals/libraries/). Open your `game.project` file and in the dependencies field under project add:
 
 https://github.com/defold/extension-push/archive/master.zip
@@ -123,8 +123,6 @@ And from the iOS homescreen:
 ![iOS notification](push_ios_notification.png)
 
 If you wish to update the badge count from within the application, use the `push.set_badge_count()` function.
-
-
 
 
 ## Android setup
