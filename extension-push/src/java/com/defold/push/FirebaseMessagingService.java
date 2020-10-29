@@ -32,6 +32,7 @@ public class FirebaseMessagingService extends com.google.firebase.messaging.Fire
      */
     @Override
     public void onNewToken(String token) {
+        super.onNewToken(token);
         Log.d(TAG, "Refreshed token: " + token);
         Push.getInstance().sendToken(token);
     }

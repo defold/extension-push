@@ -42,6 +42,11 @@ static void PushError(lua_State* L, const char* error)
 
 static void HandleRegistrationResult(const dmPush::Command* cmd)
 {
+    if (!dmScript::IsCallbackValid(cmd->m_Callback))
+    {
+        return;
+    }
+
     lua_State* L = dmScript::GetCallbackLuaContext(cmd->m_Callback);
     DM_LUA_STACK_CHECK(L, 0);
 
@@ -68,6 +73,11 @@ static void HandleRegistrationResult(const dmPush::Command* cmd)
 
 static void HandlePushMessageResult(const dmPush::Command* cmd, bool local)
 {
+    if (!dmScript::IsCallbackValid(cmd->m_Callback))
+    {
+        return;
+    }
+
     lua_State* L = dmScript::GetCallbackLuaContext(cmd->m_Callback);
     DM_LUA_STACK_CHECK(L, 0);
 
