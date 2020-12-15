@@ -22,3 +22,6 @@ include_dirs = extension-push
 
 [ios]
 bundle_identifier = com.defold.push
+
+[native_extension]
+app_manifest = /generated.appmanifest
