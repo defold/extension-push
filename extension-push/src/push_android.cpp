@@ -588,8 +588,10 @@ static dmExtension::Result InitializePush(dmExtension::Params* params)
 
 static dmExtension::Result FinalizePush(dmExtension::Params* params)
 {
-    if (g_Push.m_Listener)
+    if (g_Push.m_Listener) {
         dmScript::DestroyCallback(g_Push.m_Listener);
+        g_Push.m_Listener = 0;
+    }
     return dmExtension::RESULT_OK;
 }
 
