@@ -157,16 +157,18 @@ public class Push {
     }
 
     public void flushStoredNotifications() {
-        for (int i = 0; i < storedNotifications.size(); i++) {
-            StoredNotification n = storedNotifications.get(i);
-            if (n.wasLocal) {
-                this.listener.onLocalMessage(n.json, n.id, n.wasActivated);
-            } else {
-                this.listener.onMessage(n.json, n.wasActivated);
+        if (this.listener != null) {
+            for (int i = 0; i < storedNotifications.size(); i++) {
+                StoredNotification n = storedNotifications.get(i);
+                if (n.wasLocal) {
+                    this.listener.onLocalMessage(n.json, n.id, n.wasActivated);
+                } else {
+                    this.listener.onMessage(n.json, n.wasActivated);
+                }
             }
-        }
 
-        storedNotifications.clear();
+            storedNotifications.clear();
+        }
     }
 
     public void register(final Activity activity) {
@@ -177,6 +179,7 @@ public class Push {
                     startFirebase(activity);
                     loadSavedLocalMessages(activity);
                     loadSavedMessages(activity);
+                    flushStoredNotifications();
                 } catch (Throwable e) {
                     Log.e(TAG, "Failed to register", e);
                     sendRegistrationResult(null, e.getLocalizedMessage());

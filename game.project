@@ -1,7 +1,7 @@
 [project]
 title = extension-push
-dependencies = https://github.com/andsve/dirtylarry/archive/master.zip
 bundle_resources = /bundle
+dependencies#0 = https://github.com/andsve/dirtylarry/archive/master.zip
 
 [bootstrap]
 main_collection = /main/push.collectionc
@@ -25,3 +25,4 @@ bundle_identifier = com.defold.push
 
 [native_extension]
 app_manifest = /generated.appmanifest
+
