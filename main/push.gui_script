@@ -46,7 +46,7 @@ local function listener(self, payload, origin, activated)
 	pprint(payload)
 end
 
-local function push_ios(self)
+local function push_ios()
 	local alerts = { push.NOTIFICATION_BADGE, push.NOTIFICATION_SOUND, push.NOTIFICATION_ALERT }
 	push.register(alerts, function(self, token, error)
 		if token then
@@ -63,7 +63,7 @@ local function push_ios(self)
 	set_text("Waiting for push message")
 end
 
-local function push_android(self)
+local function push_android()
 	push.register(nil, function(self, token, error)
 		if token then
 			set_text("Device token: %s", token)
@@ -75,7 +75,7 @@ local function push_android(self)
 	set_text("Waiting for push message")
 end
 
-local function push_local(self, delay)
+local function push_local(delay)
 	local payload = '{"data":{"field":"Some value","field2":"Other value"}}'
 	local id, err = push.schedule(delay, "A notification!", "Hello there", payload, { action = "get going" })
 	if err then
@@ -86,7 +86,16 @@ local function push_local(self, delay)
 	return id
 end
 
-local function push_get_one(self, id)
+local function get_one()
+	local t, err = push.get_all_scheduled()
+	if err then
+		return nil
+	end
+	return next(t)
+end
+
+local function push_get_one()
+	local id = get_one()
 	if not id then
 		set_text("No local push notification sent!")
 		set_payload(stringify({}))
@@ -105,14 +114,15 @@ local function push_get_one(self, id)
 end
 
 
-local function push_get_all(self)
+local function push_get_all()
 	local t, err = push.get_all_scheduled()
 
 	set_text("push.get_all_scheduled()")
 	set_payload(stringify(t))
 end
 
-local function cancel_one(self, id)
+local function cancel_one()
+	local id = get_one()
 	if not id then
 		set_text("No local push notification sent!")
 		set_payload(stringify({}))
@@ -125,7 +135,7 @@ local function cancel_one(self, id)
 	set_payload("Cancelled: %s", id)
 end
 
-local function cancel_all(self)
+local function cancel_all()
 	local s = "cancelled:"
 	local notifications, err = push.get_all_scheduled()
 	for id, v in pairs(notifications) do
@@ -141,9 +151,9 @@ end
 function init(self)
 	local sysinfo = sys.get_sys_info()
 	if sysinfo.system_name == "Android" then
-		push_android(self)
+		push_android()
 	elseif sysinfo.system_name == "iPhone OS" then
-		push_ios(self)
+		push_ios()
 	else
 		set_text("Notifications work only on iOS or Android")
 	end
@@ -153,7 +163,7 @@ function init(self)
 	end
 
 	msg.post(".", "acquire_input_focus")
-	
+
 	set_text("push.get_all_scheduled()")
 	local t, err = push.get_all_scheduled()
 	if t then
@@ -175,24 +185,22 @@ end
 function on_input(self, action_id, action)
 	if action_id then
 		dirtylarry:button("local10", action_id, action, function()
-			self.id = push_local(self, 10)
+			push_local(10)
 		end)
 		dirtylarry:button("local30", action_id, action, function()
-			self.id = push_local(self, 30)
+			push_local(30)
 		end)
 		dirtylarry:button("get", action_id, action, function()
-			push_get_one(self, self.id)
+			push_get_one()
 		end)
 		dirtylarry:button("getall", action_id, action, function()
-			push_get_all(self)
+			push_get_all()
 		end)
 		dirtylarry:button("cancel", action_id, action, function()
-			cancel_one(self, self.id)
-			self.id = nil
+			cancel_one()
 		end)
 		dirtylarry:button("cancelall", action_id, action, function()
-			cancel_all(self)
-			self.id = nil
+			cancel_all()
 		end)
 	end
 end
