@@ -181,6 +181,11 @@ public class Push {
                     startFirebase(activity);
                     loadSavedLocalMessages(activity);
                     loadSavedMessages(activity);
+                    // Ensure that stored notifications are sent to the listener
+                    // even if the listener was set before calling register.
+                    // This can obviously happen if set_listener() is called
+                    // before register() but also in the case when the application
+                    // was started from a notification.
                     flushStoredNotifications();
                 } catch (Throwable e) {
                     Log.e(TAG, "Failed to register", e);
