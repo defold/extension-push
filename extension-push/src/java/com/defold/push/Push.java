@@ -157,18 +157,20 @@ public class Push {
     }
 
     public void flushStoredNotifications() {
-        if (this.listener != null) {
-            for (int i = 0; i < storedNotifications.size(); i++) {
-                StoredNotification n = storedNotifications.get(i);
-                if (n.wasLocal) {
-                    this.listener.onLocalMessage(n.json, n.id, n.wasActivated);
-                } else {
-                    this.listener.onMessage(n.json, n.wasActivated);
-                }
-            }
-
-            storedNotifications.clear();
+        if (this.listener == null) {
+            return;
         }
+
+        for (int i = 0; i < storedNotifications.size(); i++) {
+            StoredNotification n = storedNotifications.get(i);
+            if (n.wasLocal) {
+                this.listener.onLocalMessage(n.json, n.id, n.wasActivated);
+            } else {
+                this.listener.onMessage(n.json, n.wasActivated);
+            }
+        }
+
+        storedNotifications.clear();
     }
 
     public void register(final Activity activity) {
