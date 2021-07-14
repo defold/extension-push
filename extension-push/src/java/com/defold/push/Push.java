@@ -302,19 +302,9 @@ public class Push {
 
         removeNotification(notificationId);
 
-        Bundle extras = new Bundle();
-        int uid = notificationId;
-        extras.putInt("uid", uid);
-        extras.putString("title", title);
-        extras.putString("message", message);
-        extras.putInt("priority", priority);
-        extras.putString("payload", payload);
-        // NOTE: the extras is redundant. <-- remove extras and verify
-
         Intent intent = new Intent(activity, LocalNotificationReceiver.class);
-        intent.putExtras(extras);
-        intent.setAction("uid" + uid);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, intent, PendingIntent.FLAG_CANCEL_CURRENT | PendingIntent.FLAG_ONE_SHOT);
+        intent.setAction("uid" + notificationId);
         am.cancel(pendingIntent);
     }
 
