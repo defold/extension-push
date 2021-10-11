@@ -200,8 +200,7 @@ public class Push {
     }
 
     private JSONObject readJson(Context context, String path) {
-        try {
-            BufferedReader r = new BufferedReader(new InputStreamReader(context.openFileInput(path)));
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(context.openFileInput(path)))) {
             String json = "";
             String line = r.readLine();
             while (line != null) {
@@ -223,9 +222,8 @@ public class Push {
 
     private void storeLocalPushNotification(Context context, int uid, Bundle extras) {
         String path = createLocalPushNotificationPath(uid);
-        try {
+        try (PrintStream os = new PrintStream(context.openFileOutput(path, Context.MODE_PRIVATE))) {
             String json = getJson(extras);
-            PrintStream os = new PrintStream(context.openFileOutput(path, Context.MODE_PRIVATE));
             os.println(json);
             Log.d(TAG, String.format("Stored local notification file: %s", path));
         } catch (IOException e) {
@@ -396,11 +394,7 @@ public class Push {
     }
 
     private void loadSavedMessages(Context context) {
-        BufferedReader r = null;
-        try {
-            // Read saved remote push notifications
-            r = new BufferedReader(new InputStreamReader(
-                    context.openFileInput(SAVED_PUSH_MESSAGE_NAME)));
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(context.openFileInput(SAVED_PUSH_MESSAGE_NAME)))) {
             boolean wasActivated = Boolean.parseBoolean(r.readLine());
             String json = "";
             String line = r.readLine();
@@ -414,22 +408,12 @@ public class Push {
         } catch (IOException e) {
             Log.e(Push.TAG, "Failed to read push message from disk", e);
         } finally {
-            if (r != null) {
-                try {
-                    r.close();
-                } catch (IOException e) {
-                }
-            }
             context.deleteFile(SAVED_PUSH_MESSAGE_NAME);
         }
     }
 
     private void loadSavedLocalMessages(Context context) {
-        BufferedReader r = null;
-        try {
-            // Read saved local notifications
-            r = new BufferedReader(new InputStreamReader(
-                    context.openFileInput(SAVED_LOCAL_MESSAGE_NAME)));
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(context.openFileInput(SAVED_LOCAL_MESSAGE_NAME)))) {
             int id = Integer.parseInt(r.readLine());
             boolean wasActivated = Boolean.parseBoolean(r.readLine());
             String json = "";
@@ -443,12 +427,6 @@ public class Push {
         } catch (IOException e) {
             Log.e(Push.TAG, "Failed to read local message from disk", e);
         } finally {
-            if (r != null) {
-                try {
-                    r.close();
-                } catch (IOException e) {
-                }
-            }
             context.deleteFile(SAVED_LOCAL_MESSAGE_NAME);
         }
     }
