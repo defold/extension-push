@@ -321,6 +321,12 @@ public class Push {
         am.cancel(pendingIntent);
     }
 
+    public void cancelAllIssued(final Activity activity)
+    {
+        NotificationManager notificationManager = (NotificationManager)activity.getSystemService(NotificationManager.class);
+        notificationManager.cancelAll();
+    }
+
     public boolean hasListener() {
         if (this.listener != null) {
             return true;
