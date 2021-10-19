@@ -450,6 +450,16 @@ static int Push_GetAllScheduled(lua_State* L)
     return 1;
 }
 
+static int Push_CancelAllIssued(lua_State* L)
+{
+    DM_LUA_STACK_CHECK(L, 0);
+
+    [[UIApplication sharedApplication] setApplicationIconBadgeNumber: 1];
+    [[UIApplication sharedApplication] setApplicationIconBadgeNumber: 0];
+
+    return 0;
+}
+
 static const luaL_reg Push_methods[] =
 {
     {"register", Push_Register},
@@ -461,6 +471,7 @@ static const luaL_reg Push_methods[] =
     {"cancel", Push_Cancel},
     {"get_scheduled", Push_GetScheduled},
     {"get_all_scheduled", Push_GetAllScheduled},
+    {"cancel_all_issued", Push_CancelAllIssued},
 
     {0, 0}
 };

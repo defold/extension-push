@@ -236,6 +236,12 @@
     - name: id
       type: number
       desc: The numeric id of the local push notification
+
+#*****************************************************************************************************
+
+  - name: cancel_all_issued
+    type: function
+    desc: Use this function to cancel a previously issued local push notifications.
       
 
 #*****************************************************************************************************

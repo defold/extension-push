@@ -45,6 +45,7 @@ struct Push
     jmethodID            m_Register;
     jmethodID            m_Schedule;
     jmethodID            m_Cancel;
+    jmethodID            m_CancelAllIssued;
 
     dmScript::LuaCallbackInfo* m_Callback;
     dmScript::LuaCallbackInfo* m_Listener;
@@ -338,6 +339,16 @@ static int Push_GetAllScheduled(lua_State* L)
     return 1;
 }
 
+static int Push_CancelAllIssued(lua_State* L)
+{
+    DM_LUA_STACK_CHECK(L, 0);
+
+    JNIEnv* env = Attach();
+    env->CallVoidMethod(g_Push.m_Push, g_Push.m_CancelAllIssued, dmGraphics::GetNativeAndroidActivity());
+
+    return 0;
+}
+
 static const luaL_reg Push_methods[] =
 {
     {"register", Push_Register},
@@ -347,6 +358,7 @@ static const luaL_reg Push_methods[] =
     {"cancel", Push_Cancel},
     {"get_scheduled", Push_GetScheduled},
     {"get_all_scheduled", Push_GetAllScheduled},
+    {"cancel_all_issued", Push_CancelAllIssued},
 
     {0, 0}
 };
@@ -508,6 +520,7 @@ static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
     g_Push.m_Register = env->GetMethodID(push_class, "register", "(Landroid/app/Activity;)V");
     g_Push.m_Schedule = env->GetMethodID(push_class, "scheduleNotification", "(Landroid/app/Activity;IJLjava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V");
     g_Push.m_Cancel = env->GetMethodID(push_class, "cancelNotification", "(Landroid/app/Activity;ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;I)V");
+    g_Push.m_CancelAllIssued = env->GetMethodID(push_class, "cancelAllIssued", "(Landroid/app/Activity;)V");
 
     jmethodID get_instance_method = env->GetStaticMethodID(push_class, "getInstance", "()Lcom/defold/push/Push;");
     g_Push.m_Push = env->NewGlobalRef(env->CallStaticObjectMethod(push_class, get_instance_method));
