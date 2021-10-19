@@ -59,6 +59,7 @@ public class Push {
     public static final String SAVED_PUSH_MESSAGE_NAME = "saved_push_message";
     public static final String SAVED_LOCAL_MESSAGE_NAME = "saved_local_message";
     public static final String NOTIFICATION_CHANNEL_ID = "com.dynamo.android.notification_channel";
+    public static final String DEFOLD_NOTIFICATION = "defold_notification";
     private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
 
     private String senderIdFCM = "";
@@ -258,6 +259,57 @@ public class Push {
         context.deleteFile(createLocalPushNotificationPath(uid));
     }
 
+    private Notification getLocalNotification(final Activity activity, Bundle extras, int uid) {
+        Intent new_intent = new Intent(activity, PushDispatchActivity.class).setAction(Push.ACTION_FORWARD_PUSH);
+        new_intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        extras.putByte("wasActivated", (byte)1);
+        new_intent.putExtras(extras);
+        PendingIntent contentIntent = PendingIntent.getActivity(activity, uid, new_intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_ONE_SHOT);
+
+        ApplicationInfo info = activity.getApplicationInfo();
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(activity, Push.NOTIFICATION_CHANNEL_ID)
+            .setContentTitle(extras.getString("title"))
+            .setContentText(extras.getString("message"))
+            .setContentIntent(contentIntent)
+            .setPriority(extras.getInt("priority"));
+
+        // Find icons, if they were supplied
+        int smallIconId = extras.getInt("smallIcon");
+        int largeIconId = extras.getInt("largeIcon");
+        if (smallIconId == 0) {
+            smallIconId = info.icon;
+            if (smallIconId == 0) {
+                smallIconId = android.R.color.transparent;
+            }
+        }
+        if (largeIconId == 0) {
+            largeIconId = info.icon;
+            if (largeIconId == 0) {
+                largeIconId = android.R.color.transparent;
+            }
+        }
+        builder.setSmallIcon(smallIconId);
+
+        try {
+            // Get bitmap for large icon resource
+            PackageManager pm = activity.getPackageManager();
+            Resources resources = pm.getResourcesForApplication(info);
+            Bitmap largeIconBitmap = BitmapFactory.decodeResource(resources, largeIconId);
+
+            builder.setLargeIcon(largeIconBitmap);
+        } catch (PackageManager.NameNotFoundException e) {
+            builder.setSmallIcon(largeIconId);
+            Log.e("LocalNotificationReceiver", "PackageManager.NameNotFoundException!");
+        }
+
+        Notification notification = builder.build();
+        notification.defaults = Notification.DEFAULT_ALL;
+        notification.flags |= Notification.FLAG_AUTO_CANCEL;
+  
+        return notification;
+    }
+
     public void loadPendingNotifications(final Activity activity) {
         String[] files = activity.fileList();
         String prefix = String.format("%s_", Push.SAVED_LOCAL_MESSAGE_NAME);
@@ -293,6 +345,8 @@ public class Push {
 
         intent.putExtras(extras);
         intent.setAction("uid" + uid);
+        intent.putExtra(DEFOLD_NOTIFICATION, getLocalNotification(activity, extras, uid));
+
 
         PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, intent, PendingIntent.FLAG_ONE_SHOT);
         try {
