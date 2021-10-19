@@ -299,7 +299,7 @@ public class Push {
 
             builder.setLargeIcon(largeIconBitmap);
         } catch (PackageManager.NameNotFoundException e) {
-            builder.setSmallIcon(largeIconId);
+            builder.setLargeIcon(largeIconId);
             Log.e("LocalNotificationReceiver", "PackageManager.NameNotFoundException!");
         }
 
