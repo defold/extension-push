@@ -59,7 +59,7 @@ public class Push {
     public static final String SAVED_PUSH_MESSAGE_NAME = "saved_push_message";
     public static final String SAVED_LOCAL_MESSAGE_NAME = "saved_local_message";
     public static final String NOTIFICATION_CHANNEL_ID = "com.dynamo.android.notification_channel";
-    public static final String DEFOLD_NOTIFICATION = "defold_notification";
+    public static final String DEFOLD_NOTIFICATION = ".defold_notification";
     private static final int PLAY_SERVICES_RESOLUTION_REQUEST = 9000;
 
     private String senderIdFCM = "";
@@ -335,15 +335,16 @@ public class Push {
         Intent intent = new Intent(activity, LocalNotificationReceiver.class);
 
         Bundle extras = new Bundle();
-        int iconSmall = activity.getResources().getIdentifier("push_icon_small", "drawable", activity.getPackageName());
-        int iconLarge = activity.getResources().getIdentifier("push_icon_large", "drawable", activity.getPackageName());
+        String packageName = activity.getPackageName();
+        int iconSmall = activity.getResources().getIdentifier("push_icon_small", "drawable", packageName);
+        int iconLarge = activity.getResources().getIdentifier("push_icon_large", "drawable", packageName);
         putValues(extras, uid, title, message, payload, timestampMillis, priority, iconSmall, iconLarge);
 
         storeLocalPushNotification(activity, uid, extras);
 
         intent.putExtras(extras);
         intent.setAction("uid" + uid);
-        intent.putExtra(DEFOLD_NOTIFICATION, getLocalNotification(activity, extras, uid));
+        intent.putExtra(packageName + DEFOLD_NOTIFICATION, getLocalNotification(activity, extras, uid));
 
 
         PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, intent, PendingIntent.FLAG_ONE_SHOT);
