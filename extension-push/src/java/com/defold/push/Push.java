@@ -262,7 +262,6 @@ public class Push {
     private Notification getLocalNotification(final Activity activity, Bundle extras, int uid) {
         Intent new_intent = new Intent(activity, PushDispatchActivity.class).setAction(Push.ACTION_FORWARD_PUSH);
         new_intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        extras.putByte("wasActivated", (byte)1);
         new_intent.putExtras(extras);
         PendingIntent contentIntent = PendingIntent.getActivity(activity, uid, new_intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_ONE_SHOT);
 
@@ -299,7 +298,6 @@ public class Push {
 
             builder.setLargeIcon(largeIconBitmap);
         } catch (PackageManager.NameNotFoundException e) {
-            builder.setLargeIcon(largeIconId);
             Log.e("LocalNotificationReceiver", "PackageManager.NameNotFoundException!");
         }
 
@@ -581,9 +579,23 @@ public class Push {
         return result;
     }
 
-    void onRemotePush(String payload, boolean wasActivated) {
+    void onRemotePush(Context context, String payload, boolean wasActivated) {
         if (listener != null) {
             listener.onMessage(payload, wasActivated);
+        }
+        else {
+            PrintStream os = null;
+            try {
+                os = new PrintStream(context.openFileOutput(Push.SAVED_PUSH_MESSAGE_NAME, Context.MODE_PRIVATE));
+                os.println(wasActivated);
+                os.println(payload);
+            } catch (Throwable e) {
+                Log.e(Push.TAG, "Failed to write push message to disk", e);
+            } finally {
+                if (os != null) {
+                    os.close();
+                }
+            }
         }
     }
 
@@ -593,40 +605,45 @@ public class Push {
         Log.d(TAG, String.format("Removed local notification file: %s  (%s)", path, Boolean.toString(deleted)));
     }
 
-    void onLocalPush(String msg, int id, boolean wasActivated) {
-        removeNotification(id);
-
+    void onLocalPush(Context context, String msg, int id, boolean wasActivated) {
         if (listener != null) {
+            removeNotification(id);
             listener.onLocalMessage(msg, id, wasActivated);
+        }
+        else {
+            PrintStream os = null;
+            try {
+                os = new PrintStream(context.openFileOutput(Push.SAVED_LOCAL_MESSAGE_NAME, Context.MODE_PRIVATE));
+                os.println(id);
+                os.println(wasActivated);
+                os.println(msg);
+            } catch (Throwable e) {
+                Log.e(Push.TAG, "Failed to write push message to disk", e);
+            } finally {
+                if (os != null) {
+                    os.close();
+                }
+            }
         }
     }
 
     public void showNotification(Context context, Map<String, String> extras) {
-
-        Intent intent = new Intent(context, PushDispatchActivity.class)
-                .setAction(ACTION_FORWARD_PUSH);
-        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-
         JSONObject payloadJson = toJson(extras);
         String payloadString = payloadJson.toString();
+
+        // If activity is visible we can just send data to the listener without intent
+        if (isDefoldActivityVisible()) {
+            onRemotePush(context, payloadString, false);
+            return;
+        }
+
+        Intent intent = new Intent(context, PushDispatchActivity.class).setAction(ACTION_FORWARD_PUSH);
+        intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
         intent.putExtra("payload", payloadString);
 
         Bundle extrasBundle = intent.getExtras();
         extrasBundle.putByte("remote", (byte)1);
-
-        // App is visible, trigger the intent directly.
-        if (isDefoldActivityVisible()) {
-            extrasBundle.putByte("wasActivated", (byte)0);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            context.startActivity(intent);
-            return;
-        }
-
-        // App is not visible, this means that we need to display a notification.
-        // This means that when the intent is triggered next time it will be
-        // from an interaction of the notification popup, and thus we can set
-        // wasActivated to 1.
-        extrasBundle.putByte("wasActivated", (byte)1);
 
         int id = (int) (System.currentTimeMillis() % Integer.MAX_VALUE);
         PendingIntent contentIntent = PendingIntent.getActivity(context, id,

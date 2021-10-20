@@ -22,8 +22,8 @@ public class LocalNotificationReceiver extends BroadcastReceiver {
         int id = extras.getInt("uid");
 
         if (Push.isDefoldActivityVisible()) {
-            // If activity is visible we can just send data to the listener without using dispatch
-            Push.getInstance().onLocalPush(extras.getString("payload"), id, false);
+            // If activity is visible we can just send data to the listener without intent
+            Push.getInstance().onLocalPush(context, extras.getString("payload"), id, false);
         } else {
             Notification notification = intent.getParcelableExtra(Push.DEFOLD_NOTIFICATION);
             nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
