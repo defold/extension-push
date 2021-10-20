@@ -349,7 +349,11 @@ public class Push {
 
         PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, intent, PendingIntent.FLAG_ONE_SHOT);
         try {
-            am.set(AlarmManager.RTC_WAKEUP, timestampMillis, pendingIntent);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestampMillis, pendingIntent);
+            } else {
+                am.set(AlarmManager.RTC_WAKEUP, timestampMillis, pendingIntent);
+            }
         }
         catch(java.lang.SecurityException e) {
             Log.e(TAG, "Failed to schedule notification", e);
