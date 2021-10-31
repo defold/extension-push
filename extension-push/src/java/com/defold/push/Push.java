@@ -332,7 +332,7 @@ public class Push {
         if (am == null) {
             am = (AlarmManager) activity.getSystemService(activity.ALARM_SERVICE);
         }
-        Intent intent = new Intent(activity, LocalNotificationReceiver.class);
+        Intent intent = new Intent(activity.getApplicationContext(), LocalNotificationReceiver.class);
 
         Bundle extras = new Bundle();
         String packageName = activity.getPackageName();
@@ -340,7 +340,7 @@ public class Push {
         int iconLarge = activity.getResources().getIdentifier("push_icon_large", "drawable", packageName);
         putValues(extras, uid, title, message, payload, timestampMillis, priority, iconSmall, iconLarge);
 
-        storeLocalPushNotification(activity, uid, extras);
+        storeLocalPushNotification(activity.getApplicationContext(), uid, extras);
 
         intent.putExtras(extras);
         intent.setAction("uid" + uid);
