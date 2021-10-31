@@ -345,7 +345,7 @@ static int Push_CancelAllIssued(lua_State* L)
 
     JNIEnv* env = Attach();
     env->CallVoidMethod(g_Push.m_Push, g_Push.m_CancelAllIssued, dmGraphics::GetNativeAndroidActivity());
-
+    Detach();
     return 0;
 }
 
