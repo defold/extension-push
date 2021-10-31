@@ -260,14 +260,14 @@ public class Push {
     }
 
     private Notification getLocalNotification(final Activity activity, Bundle extras, int uid) {
-        Intent new_intent = new Intent(activity, PushDispatchActivity.class).setAction(Push.ACTION_FORWARD_PUSH);
+        Intent new_intent = new Intent(activity.getApplicationContext(), PushDispatchActivity.class).setAction(Push.ACTION_FORWARD_PUSH);
         new_intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         new_intent.putExtras(extras);
-        PendingIntent contentIntent = PendingIntent.getActivity(activity, uid, new_intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_ONE_SHOT);
+        PendingIntent contentIntent = PendingIntent.getActivity(activity.getApplicationContext(), uid, new_intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_ONE_SHOT);
 
         ApplicationInfo info = activity.getApplicationInfo();
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(activity, Push.NOTIFICATION_CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(activity.getApplicationContext(), Push.NOTIFICATION_CHANNEL_ID)
             .setContentTitle(extras.getString("title"))
             .setContentText(extras.getString("message"))
             .setContentIntent(contentIntent)
