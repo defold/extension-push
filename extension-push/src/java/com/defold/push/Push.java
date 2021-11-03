@@ -273,6 +273,8 @@ public class Push {
             .setContentIntent(contentIntent)
             .setPriority(extras.getInt("priority"));
 
+        builder.getExtras().putInt("uid", uid);
+
         // Find icons, if they were supplied
         int smallIconId = extras.getInt("smallIcon");
         int largeIconId = extras.getInt("largeIcon");
