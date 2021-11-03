@@ -259,19 +259,21 @@ public class Push {
         context.deleteFile(createLocalPushNotificationPath(uid));
     }
 
-    private Notification getLocalNotification(final Activity activity, Bundle extras, int uid) {
-        Intent new_intent = new Intent(activity, PushDispatchActivity.class).setAction(Push.ACTION_FORWARD_PUSH);
+    private Notification getLocalNotification(final Context appContext, Bundle extras, int uid) {
+        Intent new_intent = new Intent(appContext, PushDispatchActivity.class).setAction(Push.ACTION_FORWARD_PUSH);
         new_intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         new_intent.putExtras(extras);
-        PendingIntent contentIntent = PendingIntent.getActivity(activity, uid, new_intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_ONE_SHOT);
+        PendingIntent contentIntent = PendingIntent.getActivity(appContext, uid, new_intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_ONE_SHOT);
 
-        ApplicationInfo info = activity.getApplicationInfo();
+        ApplicationInfo info = appContext.getApplicationInfo();
 
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(activity, Push.NOTIFICATION_CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(appContext, Push.NOTIFICATION_CHANNEL_ID)
             .setContentTitle(extras.getString("title"))
             .setContentText(extras.getString("message"))
             .setContentIntent(contentIntent)
             .setPriority(extras.getInt("priority"));
+
+        builder.getExtras().putInt("uid", uid);
 
         // Find icons, if they were supplied
         int smallIconId = extras.getInt("smallIcon");
@@ -292,7 +294,7 @@ public class Push {
 
         try {
             // Get bitmap for large icon resource
-            PackageManager pm = activity.getPackageManager();
+            PackageManager pm = appContext.getPackageManager();
             Resources resources = pm.getResourcesForApplication(info);
             Bitmap largeIconBitmap = BitmapFactory.decodeResource(resources, largeIconId);
 
@@ -332,7 +334,9 @@ public class Push {
         if (am == null) {
             am = (AlarmManager) activity.getSystemService(activity.ALARM_SERVICE);
         }
-        Intent intent = new Intent(activity, LocalNotificationReceiver.class);
+
+        Context appContext = activity.getApplicationContext();
+        Intent intent = new Intent(appContext, LocalNotificationReceiver.class);
 
         Bundle extras = new Bundle();
         String packageName = activity.getPackageName();
@@ -340,14 +344,14 @@ public class Push {
         int iconLarge = activity.getResources().getIdentifier("push_icon_large", "drawable", packageName);
         putValues(extras, uid, title, message, payload, timestampMillis, priority, iconSmall, iconLarge);
 
-        storeLocalPushNotification(activity, uid, extras);
+        storeLocalPushNotification(appContext, uid, extras);
 
         intent.putExtras(extras);
         intent.setAction("uid" + uid);
-        intent.putExtra(packageName + DEFOLD_NOTIFICATION, getLocalNotification(activity, extras, uid));
+        intent.putExtra(packageName + DEFOLD_NOTIFICATION, getLocalNotification(appContext, extras, uid));
 
 
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, intent, PendingIntent.FLAG_ONE_SHOT);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(appContext, 0, intent, PendingIntent.FLAG_ONE_SHOT);
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestampMillis, pendingIntent);

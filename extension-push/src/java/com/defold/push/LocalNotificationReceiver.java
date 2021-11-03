@@ -26,8 +26,10 @@ public class LocalNotificationReceiver extends BroadcastReceiver {
             Push.getInstance().onLocalPush(context, extras.getString("payload"), id, false);
         } else {
             Notification notification = intent.getParcelableExtra(context.getPackageName() + Push.DEFOLD_NOTIFICATION);
-            nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-            nm.notify(id, notification);
+            if (notification != null) {
+                nm = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+                nm.notify(id, notification);
+            }
         }
 
     }
