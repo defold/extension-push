@@ -3,21 +3,10 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <dmsdk/sdk.h>
+#include <dmsdk/dlib/android.h>
 #include "push_utils.h"
 
 #define LIB_NAME "push"
-
-static JNIEnv* Attach()
-{
-    JNIEnv* env;
-    dmGraphics::GetNativeAndroidJavaVM()->AttachCurrentThread(&env, NULL);
-    return env;
-}
-
-static void Detach()
-{
-    dmGraphics::GetNativeAndroidJavaVM()->DetachCurrentThread();
-}
 
 struct ScheduledNotification
 {
@@ -66,9 +55,10 @@ static int Push_Register(lua_State* L)
     // NOTE: We ignore argument one. Only for iOS
     g_Push.m_Callback = dmScript::CreateCallback(L, 2);
 
-    JNIEnv* env = Attach();
+    dmAndroid::ThreadAttacher threadAttacher;
+    JNIEnv* env = threadAttacher.GetEnv();
+
     env->CallVoidMethod(g_Push.m_Push, g_Push.m_Register, dmGraphics::GetNativeAndroidActivity());
-    Detach();
 
     return 0;
 }
@@ -83,9 +73,10 @@ static int Push_SetListener(lua_State* L)
     g_Push.m_Listener = dmScript::CreateCallback(L, 1);
 
     // Flush stored notifications stored on Java side
-    JNIEnv* env = Attach();
+    dmAndroid::ThreadAttacher threadAttacher;
+    JNIEnv* env = threadAttacher.GetEnv();
+
     env->CallVoidMethod(g_Push.m_Push, g_Push.m_FlushStored);
-    Detach();
 
     return 0;
 }
@@ -185,7 +176,9 @@ static int Push_Schedule(lua_State* L)
     }
     g_Push.m_ScheduledNotifications.Push( sn );
 
-    JNIEnv* env = Attach();
+    dmAndroid::ThreadAttacher threadAttacher;
+    JNIEnv* env = threadAttacher.GetEnv();
+
     jstring jtitle   = env->NewStringUTF(sn.title);
     jstring jmessage = env->NewStringUTF(sn.message);
     jstring jpayload = env->NewStringUTF(sn.payload);
@@ -193,7 +186,6 @@ static int Push_Schedule(lua_State* L)
     env->DeleteLocalRef(jpayload);
     env->DeleteLocalRef(jmessage);
     env->DeleteLocalRef(jtitle);
-    Detach();
 
     assert(top == lua_gettop(L));
 
@@ -239,7 +231,8 @@ static int Push_Cancel(lua_State* L)
 
         if (sn.id == cancel_id)
         {
-            JNIEnv* env = Attach();
+            dmAndroid::ThreadAttacher threadAttacher;
+            JNIEnv* env = threadAttacher.GetEnv();
             jstring jtitle   = env->NewStringUTF(sn.title);
             jstring jmessage = env->NewStringUTF(sn.message);
             jstring jpayload = env->NewStringUTF(sn.payload);
@@ -247,7 +240,6 @@ static int Push_Cancel(lua_State* L)
             env->DeleteLocalRef(jpayload);
             env->DeleteLocalRef(jmessage);
             env->DeleteLocalRef(jtitle);
-            Detach();
 
             RemoveNotification(cancel_id);
             break;
@@ -343,9 +335,11 @@ static int Push_CancelAllIssued(lua_State* L)
 {
     DM_LUA_STACK_CHECK(L, 0);
 
-    JNIEnv* env = Attach();
+    dmAndroid::ThreadAttacher threadAttacher;
+    JNIEnv* env = threadAttacher.GetEnv();
+
     env->CallVoidMethod(g_Push.m_Push, g_Push.m_CancelAllIssued, dmGraphics::GetNativeAndroidActivity());
-    Detach();
+
     return 0;
 }
 
@@ -498,21 +492,11 @@ static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
 {
     dmPush::QueueCreate(&g_Push.m_CommandQueue);
 
-    JNIEnv* env = Attach();
+    dmAndroid::ThreadAttacher threadAttacher;
+    JNIEnv* env = threadAttacher.GetEnv();
 
-    jclass activity_class = env->FindClass("android/app/NativeActivity");
-    jmethodID get_class_loader = env->GetMethodID(activity_class,"getClassLoader", "()Ljava/lang/ClassLoader;");
-    jobject cls = env->CallObjectMethod(dmGraphics::GetNativeAndroidActivity(), get_class_loader);
-    jclass class_loader = env->FindClass("java/lang/ClassLoader");
-    jmethodID find_class = env->GetMethodID(class_loader, "loadClass", "(Ljava/lang/String;)Ljava/lang/Class;");
-
-    jstring str_class_name = env->NewStringUTF("com.defold.push.Push");
-    jclass push_class = (jclass)env->CallObjectMethod(cls, find_class, str_class_name);
-    env->DeleteLocalRef(str_class_name);
-
-    str_class_name = env->NewStringUTF("com.defold.push.PushJNI");
-    jclass push_jni_class = (jclass)env->CallObjectMethod(cls, find_class, str_class_name);
-    env->DeleteLocalRef(str_class_name);
+    jclass push_class = dmAndroid::LoadClass(env, "com.defold.push.Push");
+    jclass push_jni_class = dmAndroid::LoadClass(env, "com.defold.push.PushJNI");
 
     g_Push.m_Start = env->GetMethodID(push_class, "start", "(Landroid/app/Activity;Lcom/defold/push/IPushListener;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
     g_Push.m_Stop = env->GetMethodID(push_class, "stop", "()V");
@@ -546,8 +530,6 @@ static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
     jmethodID loadPendingNotifications = env->GetMethodID(push_class, "loadPendingNotifications", "(Landroid/app/Activity;)V");
     env->CallVoidMethod(g_Push.m_Push, loadPendingNotifications, dmGraphics::GetNativeAndroidActivity());
 
-    Detach();
-
     return dmExtension::RESULT_OK;
 }
 
@@ -559,11 +541,14 @@ static dmExtension::Result UpdatePush(dmExtension::Params* params)
 
 static dmExtension::Result AppFinalizePush(dmExtension::AppParams* params)
 {
-    JNIEnv* env = Attach();
-    env->CallVoidMethod(g_Push.m_Push, g_Push.m_Stop);
-    env->DeleteGlobalRef(g_Push.m_Push);
-    env->DeleteGlobalRef(g_Push.m_PushJNI);
-    Detach();
+    {
+        dmAndroid::ThreadAttacher threadAttacher;
+        JNIEnv* env = threadAttacher.GetEnv();
+
+        env->CallVoidMethod(g_Push.m_Push, g_Push.m_Stop);
+        env->DeleteGlobalRef(g_Push.m_Push);
+        env->DeleteGlobalRef(g_Push.m_PushJNI);
+    }
     g_Push.m_Push = NULL;
     g_Push.m_PushJNI = NULL;
 
