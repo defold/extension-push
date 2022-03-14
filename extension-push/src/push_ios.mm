@@ -110,7 +110,7 @@ static const char* ObjCToJson(id obj)
     dmPush::Command cmd;
     cmd.m_Callback = g_Push.m_Listener;
     cmd.m_Command = dmPush::COMMAND_TYPE_LOCAL_MESSAGE_RESULT;
-    cmd.m_Result = ObjCToJson(notification.userInfo);
+    cmd.m_Result = strdup([[notification.userInfo valueForKey: @"payload"] UTF8String]);
     cmd.m_WasActivated = wasActivated;
 
     if (g_Push.m_Listener) {
