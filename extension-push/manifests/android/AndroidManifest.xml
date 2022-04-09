@@ -25,6 +25,7 @@
         <activity android:name="com.defold.push.PushDispatchActivity"
             android:theme="@android:style/Theme.Translucent.NoTitleBar"
             android:launchMode="singleTask"
+            android:exported="false"
             android:configChanges="keyboardHidden|orientation|screenSize">
             <intent-filter>
                 <action android:name="com.defold.push.FORWARD" />
