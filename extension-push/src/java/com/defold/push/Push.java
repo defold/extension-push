@@ -271,7 +271,8 @@ public class Push {
             .setContentTitle(extras.getString("title"))
             .setContentText(extras.getString("message"))
             .setContentIntent(contentIntent)
-            .setPriority(extras.getInt("priority"));
+            .setPriority(extras.getInt("priority"))
+            .setWhen(extras.getLong("timestamp"));
 
         builder.getExtras().putInt("uid", uid);
 
