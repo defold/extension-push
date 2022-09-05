@@ -276,21 +276,8 @@ public class Push {
 
         builder.getExtras().putInt("uid", uid);
 
-        // Find icons, if they were supplied
         int smallIconId = extras.getInt("smallIcon");
         int largeIconId = extras.getInt("largeIcon");
-        if (smallIconId == 0) {
-            smallIconId = info.icon;
-            if (smallIconId == 0) {
-                smallIconId = android.R.color.transparent;
-            }
-        }
-        if (largeIconId == 0) {
-            largeIconId = info.icon;
-            if (largeIconId == 0) {
-                largeIconId = android.R.color.transparent;
-            }
-        }
         builder.setSmallIcon(smallIconId);
 
         try {
@@ -330,6 +317,19 @@ public class Push {
         }
     }
 
+    private int getIconId(Context context, String icon_id) {
+        // Find icons if they were supplied, fallback to app icon
+        int iconId = context.getResources().getIdentifier(icon_id, "drawable", context.getPackageName());
+        if (iconId == 0) {
+            ApplicationInfo info = context.getApplicationInfo();
+            iconId = info.icon;
+            if (iconId == 0) {
+                iconId = android.R.color.transparent;
+            }
+        }
+        return iconId;
+    }
+
     public void scheduleNotification(final Activity activity, int uid, long timestampMillis, String title, String message, String payload, int priority) {
 
         if (am == null) {
@@ -341,9 +341,10 @@ public class Push {
 
         Bundle extras = new Bundle();
         String packageName = activity.getPackageName();
-        int iconSmall = activity.getResources().getIdentifier("push_icon_small", "drawable", packageName);
-        int iconLarge = activity.getResources().getIdentifier("push_icon_large", "drawable", packageName);
-        putValues(extras, uid, title, message, payload, timestampMillis, priority, iconSmall, iconLarge);
+        int smallIconId = getIconId(appContext, "push_icon_small");
+        int largeIconId = getIconId(appContext, "push_icon_large");
+
+        putValues(extras, uid, title, message, payload, timestampMillis, priority, smallIconId, largeIconId);
 
         storeLocalPushNotification(appContext, uid, extras);
 
@@ -697,21 +698,8 @@ public class Push {
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT)
                 .setContentText(text);
 
-        // Find icons if they were supplied, fallback to app icon
-        int smallIconId = context.getResources().getIdentifier("push_icon_small", "drawable", context.getPackageName());
-        int largeIconId = context.getResources().getIdentifier("push_icon_large", "drawable", context.getPackageName());
-        if (smallIconId == 0) {
-            smallIconId = info.icon;
-            if (smallIconId == 0) {
-                smallIconId = android.R.color.transparent;
-            }
-        }
-        if (largeIconId == 0) {
-            largeIconId = info.icon;
-            if (largeIconId == 0) {
-                largeIconId = android.R.color.transparent;
-            }
-        }
+        int smallIconId = getIconId(context, "push_icon_small");
+        int largeIconId = getIconId(context, "push_icon_large");
 
         // Get bitmap for large icon resource
         try {
