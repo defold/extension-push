@@ -379,7 +379,13 @@ public class Push {
 
         Intent intent = new Intent(activity, LocalNotificationReceiver.class);
         intent.setAction("uid" + notificationId);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, intent, PendingIntent.FLAG_ONE_SHOT);
+        int flags = PendingIntent.FLAG_ONE_SHOT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // https://github.com/defold/extension-push/issues/46
+            flags = flags & PendingIntent.FLAG_IMMUTABLE;
+        }
+
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, intent, flags);
         am.cancel(pendingIntent);
     }
 
