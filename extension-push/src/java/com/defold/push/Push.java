@@ -363,7 +363,8 @@ public class Push {
         final int flags = createPendingIntentFlags(PendingIntent.FLAG_ONE_SHOT);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(appContext, 0, intent, flags);
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            // from S the use of exact alarms requires additional permissions
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestampMillis, pendingIntent);
             } else {
                 am.set(AlarmManager.RTC_WAKEUP, timestampMillis, pendingIntent);
