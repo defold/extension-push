@@ -196,6 +196,14 @@ public class Push {
         });
     }
 
+    private int createPendingIntentFlags(int flags) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // https://github.com/defold/extension-push/issues/46
+            flags = flags | PendingIntent.FLAG_IMMUTABLE;
+        }
+        return flags;
+    }
+
     private String createLocalPushNotificationPath(int uid) {
         return String.format("%s_%d", Push.SAVED_LOCAL_MESSAGE_NAME, uid);
     }
@@ -263,7 +271,8 @@ public class Push {
         Intent new_intent = new Intent(appContext, PushDispatchActivity.class).setAction(Push.ACTION_FORWARD_PUSH);
         new_intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         new_intent.putExtras(extras);
-        PendingIntent contentIntent = PendingIntent.getActivity(appContext, uid, new_intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_ONE_SHOT);
+        final int flags = createPendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_ONE_SHOT);
+        PendingIntent contentIntent = PendingIntent.getActivity(appContext, uid, new_intent, flags);
 
         ApplicationInfo info = appContext.getApplicationInfo();
 
@@ -351,8 +360,8 @@ public class Push {
         intent.setAction("uid" + uid);
         intent.putExtra(packageName + DEFOLD_NOTIFICATION, getLocalNotification(appContext, extras, uid));
 
-
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(appContext, 0, intent, PendingIntent.FLAG_ONE_SHOT);
+        final int flags = createPendingIntentFlags(PendingIntent.FLAG_ONE_SHOT);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(appContext, 0, intent, flags);
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, timestampMillis, pendingIntent);
@@ -379,12 +388,7 @@ public class Push {
 
         Intent intent = new Intent(activity, LocalNotificationReceiver.class);
         intent.setAction("uid" + notificationId);
-        int flags = PendingIntent.FLAG_ONE_SHOT;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // https://github.com/defold/extension-push/issues/46
-            flags = flags & PendingIntent.FLAG_IMMUTABLE;
-        }
-
+        final int flags = createPendingIntentFlags(PendingIntent.FLAG_ONE_SHOT);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(activity, 0, intent, flags);
         am.cancel(pendingIntent);
     }
@@ -662,8 +666,8 @@ public class Push {
         extrasBundle.putByte("remote", (byte)1);
 
         int id = (int) (System.currentTimeMillis() % Integer.MAX_VALUE);
-        PendingIntent contentIntent = PendingIntent.getActivity(context, id,
-                intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_ONE_SHOT);
+        final int flags = createPendingIntentFlags(PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_ONE_SHOT);
+        PendingIntent contentIntent = PendingIntent.getActivity(context, id, intent, flags);
 
         String fieldTitle = null;
         String fieldText = null;
