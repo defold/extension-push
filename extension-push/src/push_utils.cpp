@@ -4,27 +4,17 @@
 
 #include "push_utils.h"
 
-bool dmPush::VerifyPayload(lua_State* L, const char* payload, char* error_str_out, size_t error_str_size)
+void dmPush::VerifyPayload(lua_State* L, const char* payload)
 {
     int top = lua_gettop(L);
-    bool success = false;
 
-    dmJson::Document doc;
-    dmJson::Result r = dmJson::Parse(payload, &doc);
-    if (r == dmJson::RESULT_OK && doc.m_NodeCount > 0) {
-        if (dmScript::JsonToLua(L, &doc, 0, error_str_out, error_str_size) >= 0) {
-            success = true;
-            // JsonToLua will push Lua values on the stack, but they will not be used
-            // since we only want to verify that the JSON can be converted to Lua here.
-            lua_pop(L, lua_gettop(L) - top);
-        }
-    } else {
-        dmLogError("Failed to parse JSON payload string (%d)", r);
-    }
-    dmJson::Free(&doc);
+    dmScript::JsonToLua(L, payload, strlen(payload)); // throws lua error if it fails
+
+    // JsonToLua will push Lua values on the stack, but they will not be used
+    // since we only want to verify that the JSON can be converted to Lua here.
+    lua_pop(L, lua_gettop(L) - top);
 
     assert(top == lua_gettop(L));
-    return success;
 }
 
 static void PushError(lua_State* L, const char* error)
@@ -86,26 +76,15 @@ static void HandlePushMessageResult(const dmPush::Command* cmd, bool local)
         return;
     }
 
-    dmJson::Document doc;
-    dmJson::Result r = dmJson::Parse((const char*) cmd->m_Result, &doc);
-    if (r == dmJson::RESULT_OK && doc.m_NodeCount > 0) {
-        char err_str[128];
-        if (dmScript::JsonToLua(L, &doc, 0, err_str, sizeof(err_str)) < 0) {
-            dmLogError("Failed converting push result JSON to Lua; %s", err_str);
-            dmJson::Free(&doc);
-            return;
-        }
+    const char* json = (const char*) cmd->m_Result;
 
-        lua_pushnumber(L, local ? dmPush::ORIGIN_LOCAL : dmPush::ORIGIN_REMOTE);
-        lua_pushboolean(L, cmd->m_WasActivated);
+    dmScript::JsonToLua(L, json, strlen(json)); // throws lua error if it fails
 
-        int ret = dmScript::PCall(L, 4, 0);
-        (void)ret;
-    } else {
-        lua_pop(L, 2);
-        dmLogError("Failed to parse push response (%d)", r);
-    }
-    dmJson::Free(&doc);
+    lua_pushnumber(L, local ? dmPush::ORIGIN_LOCAL : dmPush::ORIGIN_REMOTE);
+    lua_pushboolean(L, cmd->m_WasActivated);
+
+    int ret = dmScript::PCall(L, 4, 0);
+    (void)ret;
 
     dmScript::TeardownCallback(cmd->m_Callback);
 }
