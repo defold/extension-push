@@ -49,7 +49,7 @@ namespace dmPush
 
 	void HandleCommand(dmPush::Command* push, void* ctx);
 
-    bool VerifyPayload(lua_State* L, const char* payload, char* error_str_out, size_t error_str_size);
+	void VerifyPayload(lua_State* L, const char* payload);
 }
 
 #endif
