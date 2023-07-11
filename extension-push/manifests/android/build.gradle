@@ -1,5 +1,9 @@
+repositories {
+    mavenCentral()
+}
+
 dependencies {
   // https://firebase.google.com/docs/android/setup#available-libraries
-  compile 'com.google.firebase:firebase-messaging:21.0.0'
+  implementation 'com.google.firebase:firebase-messaging:21.0.0'
   implementation "androidx.core:core:1.5.0"
 }
