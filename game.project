@@ -2,6 +2,7 @@
 title = extension-push
 bundle_resources = /bundle
 dependencies#0 = https://github.com/andsve/dirtylarry/archive/master.zip
+dependencies#1 = https://github.com/defold/extension-permissions/archive/refs/tags/1.0.0.zip
 
 [bootstrap]
 main_collection = /main/push.collectionc
