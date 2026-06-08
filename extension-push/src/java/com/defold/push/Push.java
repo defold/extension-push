@@ -47,8 +47,7 @@ import com.google.android.gms.tasks.OnCompleteListener;
 
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
-import com.google.firebase.iid.FirebaseInstanceId;
-import com.google.firebase.iid.InstanceIdResult;
+import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.RemoteMessage;
 
 public class Push {
@@ -425,19 +424,17 @@ public class Push {
             return;
         }
 
-        FirebaseInstanceId.getInstance().getInstanceId()
-                .addOnCompleteListener(new OnCompleteListener<InstanceIdResult>() {
+        FirebaseMessaging.getInstance().getToken()
+                .addOnCompleteListener(new OnCompleteListener<String>() {
                     @Override
-                    public void onComplete(Task<InstanceIdResult> task) {
+                    public void onComplete(Task<String> task) {
                         if (!task.isSuccessful()) {
-                            Log.w(TAG, "getInstanceId failed", task.getException());
+                            Log.w(TAG, "getToken failed", task.getException());
                             sendRegistrationResult(null, task.getException().getLocalizedMessage());
                             return;
                         }
 
-                        // Get new Instance ID token
-                        String token = task.getResult().getToken();
-                        sendToken(token);
+                        sendToken(task.getResult());
                     }
                 });
     }
