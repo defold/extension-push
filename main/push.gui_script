@@ -45,19 +45,18 @@ local function check_permission(permission, fn, ...)
 		return
 	end
 
-	if res == permissions.PERMISSION_DENIED then
-		set_text("Permission denied")
-	elseif res == permissions.PERMISSION_SHOW_RATIONALE then
+	if res == permissions.PERMISSION_SHOW_RATIONALE then
 		set_text("We need your permission to schedule a notification")
-		local args = { ... }
-		permissions.request({ permission }, function(self, result)
-			if result[permission] == permissions.PERMISSION_GRANTED then
-				fn(unpack(args))
-			else
-				set_text("Permission denied")
-			end
-		end)
 	end
+
+	local args = { ... }
+	permissions.request({ permission }, function(self, result)
+		if result[permission] == permissions.PERMISSION_GRANTED then
+			fn(unpack(args))
+		else
+			set_text("Permission denied")
+		end
+	end)
 end
 
 local function set_payload(text, ...)
