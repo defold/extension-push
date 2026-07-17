@@ -25,13 +25,11 @@ public class FirebaseMessagingService extends com.google.firebase.messaging.Fire
         }
     }
 
-    /**
-     * Called if the FCM registration token is updated.
-     */
+    /** Called after FCM registers or refreshes this Firebase installation. */
     @Override
-    public void onNewToken(String token) {
-        super.onNewToken(token);
-        Log.d(TAG, "Refreshed token: " + token);
-        Push.getInstance().sendToken(token);
+    public void onRegistered(String installationId) {
+        super.onRegistered(installationId);
+        Log.d(TAG, "Registered Firebase installation ID: " + installationId);
+        Push.getInstance().sendRegistrationId(installationId);
     }
 }
