@@ -27,7 +27,7 @@
 
       - name: token
         type: string
-        desc: The returned push token if registration is successful.
+        desc: The APNs device token on iOS or Firebase Installation ID (FID) on Android if registration is successful.
 
       - name: error
         type: table
@@ -67,9 +67,9 @@
             end
 
             function init(self)
-                 push.register({}, function (self, token, error)
-                     if token then
-                          print(token)
+                 push.register({}, function (self, installation_id, error)
+                     if installation_id then
+                          print(installation_id)
                           push.set_listener(push_listener)
                      else
                           -- Push registration failed.

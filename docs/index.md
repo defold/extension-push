@@ -7,7 +7,7 @@ brief: This manual covers how to setup and use push notifications in Defold.
 
 Push notifications are available on iOS and Android (Google using Firebase Cloud Messaging) devices as a [native extension](/manuals/extensions/) and allow your game to inform the player about changes and updates. The core functionality is similar between iOS and Android but there are some platform specific differences that you need to consider.
 
-For a push notification to find its way from the server to the target device, certain bits of information are required for your app. The most complex part consists of security information that you set in the application so the notification system can verify the legitimacy of the client receiving notifications. But you will also need a piece of security information for your notification server so the Apple or Google servers can verify that your server is a legitimate notification sender. Finally, when you send notifications, you need to be able to uniquely direct notifications to a specific user's device. For that you retrieve and use a token that is unique to the particular device (i.e. user).
+For a push notification to find its way from the server to the target device, certain bits of information are required for your app. The most complex part consists of security information that you set in the application so the notification system can verify the legitimacy of the client receiving notifications. But you will also need a piece of security information for your notification server so the Apple or Google servers can verify that your server is a legitimate notification sender. Finally, when you send notifications, you need to be able to uniquely direct notifications to a specific app installation. The extension returns an APNs device token on iOS and a Firebase Installation ID (FID) on Android.
 
 
 ## Installation
@@ -81,10 +81,10 @@ function on_message(self, message_id, message)
         end)
         push.set_listener(push_listener)
     elseif message_id == hash("push_android") then
-        push.register(nil, function (self, token, error)
-            if token then
-                -- Print the device token
-                print(token)
+        push.register(nil, function (self, installation_id, error)
+            if installation_id then
+                -- Print the Firebase Installation ID (FID)
+                print(installation_id)
             else
                 -- Error
                 print(error.error)
@@ -95,7 +95,7 @@ function on_message(self, message_id, message)
 end
 ```
 
-If all goes well the notification listener will be registered and we get a token that we can use:
+If all goes well the notification listener will be registered. On iOS, the callback returns a device token such as:
 
 ```txt
 DEBUG:SCRIPT: 1f8ba7869b84b10df69a07aa623cd7f55f62bca22cef61b51fedac643ec61ad8
@@ -127,6 +127,8 @@ If you wish to update the badge count from within the application, use the `push
 
 ## Android setup
 Push notification on Android uses Firebase Cloud Messaging. You need to configure an application in the Firebase Console. The steps below taken from the [official Google Firebase Guides](https://firebase.google.com/docs/android/setup#create-firebase-project).
+
+Firebase Cloud Messaging 25 requires Android 6.0 (API level 23) or newer. Set `android.minimum_sdk_version` to at least `23` in `game.project`.
 
 ::: sidenote
 Firebase has extensive documentation for Firebase Cloud Messaging. We encourage you to start by reading it on https://firebase.google.com/docs/cloud-messaging/
@@ -180,23 +182,28 @@ $ ./generate_xml_from_google_services_json.py -i google-services.json -o google-
 
 * Open `game.project` and set the `Bundle Resources` entry under the `Project` section to `/bundle` to match the folder created in the step above. Read more about the `Bundle Resources` setting in the [Defold manual](https://www.defold.com/manuals/project-settings/#_project).
 
-Now everything is ready on the client. The [above code](#above-code) example works for Android as well. Run it and copy the device token id.
+Now everything is ready on the client. The [above code](#above-code) example works for Android as well. Run it and copy the Firebase Installation ID (FID).
 
 ```txt
-DEBUG:SCRIPT: APA91bHkcKm0QHAMUCEQ_Dlpq2gzset6vh0cz46kDDV6230C5rFivyWZMCxGXcjxRDKg1PK4z1kWg3xnUVqSDiO_4_RiG8b8HeYJfaoW1ho4ukWYXjq5RE0Sy-JTyrhqRusUP_BxRTcE
+DEBUG:SCRIPT: <Firebase Installation ID>
 ```
 
-Before we can send any messages we need to get a key that will be used for authentication against the Firebase servers. You will find the key under *Settings* and *Cloud Messaging* on the Firebase dashboard.
+Firebase Cloud Messaging 25.1 replaces legacy registration tokens with FIDs. Store the returned FID on your server and use the `fid` target supported by current Firebase Admin SDKs. During the migration period the deprecated `token` target also accepts FIDs, but new integrations should use `fid`.
 
-![Server Key location](push_fcm_server_key.png)
+Before sending messages, [initialize the Firebase Admin SDK](https://firebase.google.com/docs/admin/setup) with credentials for your Firebase project. For example, using the Node.js Admin SDK:
 
-Now we have all information we need. Firebase's notifications can be sent through a Web API so we can use *curl* to send test messages:
+```js
+const { getMessaging } = require("firebase-admin/messaging");
 
-```sh
-$ curl  -X POST  -H "Content-type: application/json"  -H 'Authorization: key=SERVER_KEY' -d '{"registration_ids" : ["TOKEN_ID"], "data": {"alert": "Hello"}}' https://fcm.googleapis.com/fcm/send
+const message = {
+    data: { alert: "Hello" },
+    fid: "FIREBASE_INSTALLATION_ID"
+};
+
+getMessaging().send(message);
 ```
 
-Replace `SERVER_KEY` and `TOKEN_ID` with your specific keys.
+Replace `FIREBASE_INSTALLATION_ID` with the value returned by `push.register()` on Android. See [Send a message using the Firebase Admin SDK](https://firebase.google.com/docs/cloud-messaging/send/admin-sdk) for other supported languages and targeting options.
 
 
 ## Local push notifications

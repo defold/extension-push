@@ -424,23 +424,22 @@ public class Push {
             return;
         }
 
-        FirebaseMessaging.getInstance().getToken()
-                .addOnCompleteListener(new OnCompleteListener<String>() {
+        FirebaseMessaging.getInstance().register()
+                .addOnCompleteListener(new OnCompleteListener<Void>() {
                     @Override
-                    public void onComplete(Task<String> task) {
+                    public void onComplete(Task<Void> task) {
                         if (!task.isSuccessful()) {
-                            Log.w(TAG, "getToken failed", task.getException());
+                            Log.w(TAG, "FCM registration failed", task.getException());
                             sendRegistrationResult(null, task.getException().getLocalizedMessage());
-                            return;
                         }
-
-                        sendToken(task.getResult());
+                        // Successful registration is delivered asynchronously to
+                        // FirebaseMessagingService.onRegistered() with the FID.
                     }
                 });
     }
 
-    public void sendToken(String token) {
-        sendRegistrationResult(token, null);
+    public void sendRegistrationId(String installationId) {
+        sendRegistrationResult(installationId, null);
     }
 
     private boolean checkPlayServices(Activity activity) {

@@ -90,9 +90,9 @@ local function push_ios()
 end
 
 local function push_android()
-	push.register(nil, function(self, token, error)
-		if token then
-			set_text("Device token: %s", token)
+	push.register(nil, function(self, installation_id, error)
+		if installation_id then
+			set_text("Firebase installation ID: %s", installation_id)
 		else
 			set_text("Push error: %s", error.error)
 		end

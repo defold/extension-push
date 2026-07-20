@@ -4,6 +4,11 @@
     <uses-sdk android:minSdkVersion="{{android.minimum_sdk_version}}" android:targetSdkVersion="{{android.target_sdk_version}}" />
     <application>
 
+        <!-- Use the FCM 25.1+ Firebase Installation ID registration API. -->
+        <meta-data
+            android:name="firebase_messaging_installation_id_enabled"
+            android:value="true" />
+
         <activity android:name="com.dynamo.android.DefoldActivity">
             {{#android.push_field_title}}
             <meta-data
