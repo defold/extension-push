@@ -1,0 +1,2 @@
+# Loaded through JNI or instantiated from the Android manifest.
+-keep,allowoptimization class com.defold.push.** { *; }
