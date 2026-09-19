@@ -4,3 +4,7 @@ platforms:
     android:
       context:
         aaptExtraPackages: ['androidx.core', 'com.google.android.gms', 'com.google.android.gms.common']
+
+    ios:
+      context:
+        frameworks: ['UserNotifications']
