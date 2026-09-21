@@ -5,6 +5,7 @@
 
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
+#import <UserNotifications/UserNotifications.h>
 
 #define LIB_NAME "push"
 
@@ -22,12 +23,6 @@ struct Push
         dmPush::QueueCreate(&m_CommandQueue);
         dmPush::QueueCreate(&m_SavedNotifications);
         m_Initialized = true;
-    }
-
-    void Finalize() {
-        dmPush::QueueCreate(&m_CommandQueue);
-        dmPush::QueueCreate(&m_SavedNotifications);
-        m_Initialized = false;
     }
 
     bool                        m_Initialized;
@@ -80,63 +75,93 @@ static const char* ObjCToJson(id obj)
     return json;
 }
 
-@interface PushAppDelegate : NSObject <UIApplicationDelegate>
+static void QueueNotification(NSDictionary* userInfo, bool local, bool wasActivated)
+{
+    dmPush::Command cmd;
+    cmd.m_Command = local ? dmPush::COMMAND_TYPE_LOCAL_MESSAGE_RESULT : dmPush::COMMAND_TYPE_PUSH_MESSAGE_RESULT;
+    if (local) {
+        NSString* payload = userInfo[@"payload"];
+        cmd.m_Result = strdup(payload ? [payload UTF8String] : "{}");
+    } else {
+        cmd.m_Result = ObjCToJson(userInfo);
+    }
+    cmd.m_WasActivated = wasActivated;
+    // Bind the listener at delivery time, so replacing it or rebooting cannot
+    // leave a queued notification pointing to a destroyed Lua callback.
+    dmPush::QueuePush(&g_Push.m_SavedNotifications, &cmd);
+}
 
+static void DeliverNotification(dmPush::Command* cmd, void* ctx)
+{
+    if (g_Push.m_Listener) {
+        cmd->m_Callback = g_Push.m_Listener;
+        dmPush::HandleCommand(cmd, ctx);
+    } else {
+        dmPush::QueuePush(&g_Push.m_SavedNotifications, cmd);
+    }
+}
+
+@interface PushAppDelegate : NSObject <UIApplicationDelegate, UISceneDelegate, UNUserNotificationCenterDelegate>
+{
+    UNNotificationResponse* m_LastResponse;
+}
+- (void)handleNotificationResponse:(UNNotificationResponse*)response;
 @end
 
 @implementation PushAppDelegate
 
-- (void)application:(UIApplication *)application didReceiveRemoteNotification:(NSDictionary *)userInfo {
-    bool wasActivated = (application.applicationState == UIApplicationStateInactive
-        || application.applicationState == UIApplicationStateBackground);
-
-    dmPush::Command cmd;
-    cmd.m_Callback = g_Push.m_Listener;
-    cmd.m_Command = dmPush::COMMAND_TYPE_PUSH_MESSAGE_RESULT;
-    cmd.m_Result = ObjCToJson(userInfo);
-    cmd.m_WasActivated = wasActivated;
-
-    if (g_Push.m_Listener) {
-        dmPush::QueuePush(&g_Push.m_CommandQueue, &cmd);
-    } else {
-        dmPush::QueuePush(&g_Push.m_SavedNotifications, &cmd); // No callback yet
-    }
-}
-
-- (void)application:(UIApplication *)application didReceiveLocalNotification:(UILocalNotification *)notification {
-    bool wasActivated = (application.applicationState == UIApplicationStateInactive
-        || application.applicationState == UIApplicationStateBackground);
-
-    dmPush::Command cmd;
-    cmd.m_Callback = g_Push.m_Listener;
-    cmd.m_Command = dmPush::COMMAND_TYPE_LOCAL_MESSAGE_RESULT;
-    cmd.m_Result = strdup([[notification.userInfo valueForKey: @"payload"] UTF8String]);
-    cmd.m_WasActivated = wasActivated;
-
-    if (g_Push.m_Listener) {
-        dmPush::QueuePush(&g_Push.m_CommandQueue, &cmd);
-    } else {
-        dmPush::QueuePush(&g_Push.m_SavedNotifications, &cmd); // No callback yet
-    }
-}
-
-- (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
-{
-    if (!g_Push.IsInitialized()) {
-        g_Push.Initialize();
-    }
-
-    UILocalNotification *localNotification = [launchOptions objectForKey:UIApplicationLaunchOptionsLocalNotificationKey];
-    if (localNotification) {
-        [self application:application didReceiveLocalNotification:localNotification];
-    }
-
-    NSDictionary *remoteNotification = [launchOptions objectForKey:UIApplicationLaunchOptionsRemoteNotificationKey];
-    if (remoteNotification) {
-        [self application:application didReceiveRemoteNotification:remoteNotification];
-    }
-
+- (BOOL)application:(UIApplication*)application didFinishLaunchingWithOptions:(NSDictionary*)options {
+    [UNUserNotificationCenter currentNotificationCenter].delegate = self;
     return YES;
+}
+
+- (void)application:(UIApplication*)application didReceiveRemoteNotification:(NSDictionary*)userInfo fetchCompletionHandler:(void (^)(UIBackgroundFetchResult))completionHandler {
+    QueueNotification(userInfo, false, application.applicationState != UIApplicationStateActive);
+    completionHandler(UIBackgroundFetchResultNoData);
+}
+
+- (void)userNotificationCenter:(UNUserNotificationCenter*)center willPresentNotification:(UNNotification*)notification withCompletionHandler:(void (^)(UNNotificationPresentationOptions))completionHandler {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        bool local = ![notification.request.trigger isKindOfClass:[UNPushNotificationTrigger class]];
+        QueueNotification(notification.request.content.userInfo, local, false);
+        // Preserve foreground delivery to Lua without showing a system banner.
+        completionHandler(UNNotificationPresentationOptionNone);
+    });
+}
+
+- (void)userNotificationCenter:(UNUserNotificationCenter*)center didReceiveNotificationResponse:(UNNotificationResponse*)response withCompletionHandler:(void (^)(void))completionHandler {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self handleNotificationResponse:response];
+        completionHandler();
+    });
+}
+
+- (void)handleNotificationResponse:(UNNotificationResponse*)response {
+    if (!response || [response.actionIdentifier isEqualToString:UNNotificationDismissActionIdentifier])
+        return;
+
+    // UIKit can expose the same cold-launch response through both the scene and
+    // notification center. Compare delivery identity, not the notification payload.
+    if ([m_LastResponse.notification.request.identifier isEqualToString:response.notification.request.identifier]
+        && [m_LastResponse.notification.date isEqualToDate:response.notification.date]
+        && [m_LastResponse.actionIdentifier isEqualToString:response.actionIdentifier])
+        return;
+    [m_LastResponse release];
+    m_LastResponse = [response retain];
+
+    UNNotificationRequest* request = response.notification.request;
+    bool local = ![request.trigger isKindOfClass:[UNPushNotificationTrigger class]];
+    QueueNotification(request.content.userInfo, local, true);
+}
+
+- (void)scene:(UIScene*)scene willConnectToSession:(UISceneSession*)session options:(UISceneConnectionOptions*)options {
+    // Initial connection precedes Lua listener registration.
+    [self handleNotificationResponse:options.notificationResponse];
+}
+
+- (void)dealloc {
+    [m_LastResponse release];
+    [super dealloc];
 }
 
 - (void)application:(UIApplication *)application didRegisterForRemoteNotificationsWithDeviceToken:(NSData *)deviceToken {
@@ -472,17 +497,35 @@ static const luaL_reg Push_methods[] =
     {0, 0}
 };
 
+static void DiscardCommand(dmPush::Command* cmd, void* ctx)
+{
+    free((void*)cmd->m_Result);
+    free((void*)cmd->m_Error);
+    if (cmd->m_Command == dmPush::COMMAND_TYPE_REGISTRATION_RESULT && cmd->m_Callback)
+        dmScript::DestroyCallback(cmd->m_Callback);
+}
+
 struct PushAppDelegateRegister
 {
-    id<UIApplicationDelegate> m_Delegate;
+    PushAppDelegate* m_Delegate;
     PushAppDelegateRegister() {
+        // Scene connection can happen before extension app-initialize.
+        g_Push.Initialize();
         m_Delegate = [[PushAppDelegate alloc] init];
         dmExtension::RegisteriOSUIApplicationDelegate(m_Delegate);
+        dmExtension::RegisteriOSUISceneDelegate(m_Delegate);
     }
 
     ~PushAppDelegateRegister() {
+        dmExtension::UnregisteriOSUISceneDelegate(m_Delegate);
         dmExtension::UnregisteriOSUIApplicationDelegate(m_Delegate);
+        if ([UNUserNotificationCenter currentNotificationCenter].delegate == m_Delegate)
+            [UNUserNotificationCenter currentNotificationCenter].delegate = nil;
         [m_Delegate release];
+        dmPush::QueueFlush(&g_Push.m_CommandQueue, DiscardCommand, 0);
+        dmPush::QueueFlush(&g_Push.m_SavedNotifications, DiscardCommand, 0);
+        dmPush::QueueDestroy(&g_Push.m_CommandQueue);
+        dmPush::QueueDestroy(&g_Push.m_SavedNotifications);
     }
 };
 
@@ -498,19 +541,8 @@ static dmExtension::Result AppInitializePush(dmExtension::AppParams* params)
 
 static dmExtension::Result UpdatePush(dmExtension::Params* params)
 {
-    // Set the new callback to the saved notifications, and put them on the queue
-    if (!g_Push.m_SavedNotifications.m_Commands.Empty() & g_Push.m_Listener != 0) {
-        {
-            DM_MUTEX_SCOPED_LOCK(g_Push.m_SavedNotifications.m_Mutex);
-            for (int i = 0; i < g_Push.m_SavedNotifications.m_Commands.Size(); ++i)
-            {
-                dmPush::Command& cmd = g_Push.m_SavedNotifications.m_Commands[i];
-                cmd.m_Callback = g_Push.m_Listener;
-            }
-        }
-
-        dmPush::QueueFlush(&g_Push.m_SavedNotifications, dmPush::HandleCommand, 0);
-    }
+    if (g_Push.m_Listener)
+        dmPush::QueueFlush(&g_Push.m_SavedNotifications, DeliverNotification, 0);
 
     dmPush::QueueFlush(&g_Push.m_CommandQueue, dmPush::HandleCommand, 0);
     return dmExtension::RESULT_OK;
@@ -518,9 +550,7 @@ static dmExtension::Result UpdatePush(dmExtension::Params* params)
 
 static dmExtension::Result AppFinalizePush(dmExtension::AppParams* params)
 {
-    if (g_Push.IsInitialized()) {
-        g_Push.Finalize();
-    }
+    // Queues belong to the registered native observer and survive sys.reboot().
     return dmExtension::RESULT_OK;
 }
 
@@ -551,6 +581,10 @@ static dmExtension::Result InitializePush(dmExtension::Params* params)
 
 static dmExtension::Result FinalizePush(dmExtension::Params* params)
 {
+    // Pending notifications must target the next listener after an engine reboot.
+    dmPush::QueueFlush(&g_Push.m_CommandQueue, DiscardCommand, 0);
+    if (g_Push.m_Callback)
+        dmScript::DestroyCallback(g_Push.m_Callback);
     if (g_Push.m_Listener)
         dmScript::DestroyCallback(g_Push.m_Listener);
     g_Push.m_Listener = 0;

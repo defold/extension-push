@@ -20,6 +20,7 @@ package = com.defold.push
 minimum_sdk_version = 23
 
 [library]
+defold_min_version = 1.14.0
 include_dirs = extension-push
 
 [ios]
