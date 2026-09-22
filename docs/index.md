@@ -158,13 +158,13 @@ Firebase has extensive documentation for Firebase Cloud Messaging. We encourage 
 ![Google Cloud Messaging sender ID](push_fcm_download_json.png)
 
 
-* Run `generate_xml_from_google_services_json.py` or `generate_xml_from_google_services_json.exe` (both from [Firebase C++ SDK](https://github.com/firebase/firebase-cpp-sdk)) to convert the previously downloaded `google-services.json` to an Android resource XML:
+* Run the Python script included in this repository with Python 3 to generate the Android resource XML and its resource keep file:
 
-```
-$ ./generate_xml_from_google_services_json.py -i google-services.json -o google-services.xml
+```sh
+python3 generate_xml_from_google_services_json.py -i google-services.json -o bundle/android/res/values/google-services.xml
 ```
 
-* Copy the generated `google-services.xml` file to a folder structure like this:
+* The script creates both files in the following structure. Include both when copying the configuration to another project. The keep file preserves configuration strings that Firebase and other SDKs read by name when R8 resource shrinking is enabled.
 
 ```
 <project_root>
@@ -176,8 +176,12 @@ $ ./generate_xml_from_google_services_json.py -i google-services.json -o google-
        +-res
           |
           +-values
+          |  |
+          |  +-google-services.xml
+          |
+          +-raw
              |
-             +-google-services.xml
+             +-com.defold.push.config.keep.xml
 ```
 
 * Open `game.project` and set the `Bundle Resources` entry under the `Project` section to `/bundle` to match the folder created in the step above. Read more about the `Bundle Resources` setting in the [Defold manual](https://www.defold.com/manuals/project-settings/#_project).
@@ -204,6 +208,20 @@ getMessaging().send(message);
 ```
 
 Replace `FIREBASE_INSTALLATION_ID` with the value returned by `push.register()` on Android. See [Send a message using the Firebase Admin SDK](https://firebase.google.com/docs/cloud-messaging/send/admin-sdk) for other supported languages and targeting options.
+
+
+### Android resource shrinking
+
+The extension includes resource keep rules for the optional `push_icon_small` and `push_icon_large` drawables used by its notifications. These icons remain available when R8 resource shrinking is enabled.
+
+If you send FCM notification payloads that name custom icons, sounds, or localized strings, keep those application resources in a uniquely named XML file under `bundle/android/res/raw/`. For example, replace the following names with the resources used by your messages:
+
+```xml
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/message_icon,@raw/message_sound,@string/message_title" />
+```
+
+Resource names supplied by the server are not visible to R8 during the build. See [Android resource keep rules](https://developer.android.com/topic/performance/app-optimization/customize-which-resources-to-keep) for more details.
 
 
 ## Local push notifications
