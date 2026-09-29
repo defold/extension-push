@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Push loads optional notification icons by name through Resources.getIdentifier(). -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/push_icon_small,@drawable/push_icon_large" />

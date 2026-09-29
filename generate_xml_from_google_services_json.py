@@ -20,6 +20,8 @@ from xml.etree import ElementTree
 DEFAULT_INPUT_FILENAME = 'app/google-services.json'
 # Output filename if it isn't set.
 DEFAULT_OUTPUT_FILENAME = 'res/values/googleservices.xml'
+# Resource keep file written alongside the values directory for Android output.
+RESOURCE_KEEP_FILENAME = 'com.defold.push.config.keep.xml'
 # Input filename for .plist files, if it isn't set.
 DEFAULT_PLIST_INPUT_FILENAME = 'GoogleServices-Info.plist'
 # Output filename for .json files, if it isn't set.
@@ -165,7 +167,7 @@ def convert_plist_to_json(plist_string, input_filename):
 
 
 def gen_string(parent, name, text):
-  """Generate one <string /> element and put into the list of keeps.
+  """Generate one <string /> element.
 
   Args:
     parent:  The object that will hold the string.
@@ -173,10 +175,6 @@ def gen_string(parent, name, text):
     text:    The text of the string.
   """
   if text:
-    prev = parent.get('tools:keep', '')
-    if prev:
-      prev += ','
-    parent.set('tools:keep', prev + '@string/' + name)
     child = ElementTree.SubElement(parent, 'string', {
         'name': name,
         'translatable': 'false'
@@ -206,16 +204,40 @@ def indent(elem, level=0):
       elem.tail = i
 
 
+def write_resource_keep_file(root, output_filename):
+  """Keep generated strings that Firebase and other SDKs look up by name."""
+  output_dir = os.path.dirname(os.path.abspath(output_filename))
+  directory_name = os.path.basename(output_dir)
+  if directory_name == 'values' or directory_name.startswith('values-'):
+    resource_dir = os.path.dirname(output_dir)
+  else:
+    # A flat -o filename places the companion raw directory beside that file.
+    resource_dir = output_dir
+  raw_dir = os.path.join(resource_dir, 'raw')
+  if not os.path.exists(raw_dir):
+    os.makedirs(raw_dir)
+
+  keep = ElementTree.Element('resources')
+  keep.set('xmlns:tools', 'http://schemas.android.com/tools')
+  names = ['@string/' + child.get('name') for child in root.findall('string')]
+  if names:
+    keep.set('tools:keep', ','.join(names))
+  keep_filename = os.path.join(raw_dir, RESOURCE_KEEP_FILENAME)
+  ElementTree.ElementTree(keep).write(keep_filename, 'utf-8', True)
+
+
 def main():
   parser = argparse.ArgumentParser(
       description=((
-          'Converts a Firebase %s into %s similar to the Gradle plugin, or '
+          'Converts a Firebase %s into %s and a resource keep XML for Android, or '
           'converts a Firebase %s into a %s suitible for use on desktop apps.' %
           (DEFAULT_INPUT_FILENAME, DEFAULT_OUTPUT_FILENAME,
            DEFAULT_PLIST_INPUT_FILENAME, DEFAULT_JSON_OUTPUT_FILENAME))))
   parser.add_argument('-i', help='Override input file name',
                       metavar='FILE', required=False)
-  parser.add_argument('-o', help='Override destination file name',
+  parser.add_argument('-o', help=('Override destination file name. Android output '
+                                  'also creates raw/%s beside the values directory '
+                                  '(or beside a flat output file).' % RESOURCE_KEEP_FILENAME),
                       metavar='FILE', required=False)
   parser.add_argument('-p', help=('Package ID to select within the set of '
                                   'packages in the input file.  If this is '
@@ -270,7 +292,6 @@ def main():
     jsobj = json.loads(file_string)
 
   root = ElementTree.Element('resources')
-  root.set('xmlns:tools', 'http://schemas.android.com/tools')
 
   project_info = jsobj.get('project_info')
   if project_info:
@@ -284,7 +305,7 @@ def main():
     if not project_info:
       sys.stderr.write('No project info found in %s.' % input_filename)
       return 1
-    for field, value in project_info.iteritems():
+    for field, value in project_info.items():
       sys.stdout.write('%s=%s\n' % (field, value))
     return 0
 
@@ -384,6 +405,7 @@ def main():
 
     if not args.plist:
       tree.write(output_filename, 'utf-8', True)
+      write_resource_keep_file(root, output_filename)
     else:
       with open(output_filename, 'w') as ofile:
         ofile.write(json_string)
